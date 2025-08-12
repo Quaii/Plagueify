@@ -5,98 +5,123 @@
   <title>Plagueify — Refresh Token</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
-  <!-- Inter -->
+  <!-- Inter + Anime.js -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" defer></script>
+
   <style>
-    :root { color-scheme: dark; }
-    *, *::before, *::after { box-sizing: border-box; }
+    :root { color-scheme: dark; --bg:#0b0b0c; --ink:#e8e8ea; --line:#2b2f36; --blue1:#6da5ff; --blue2:#3a6df5; }
+    *, *::before, *::after { box-sizing:border-box; }
     html, body { height:100%; margin:0; }
     body {
-      background:#0b0b0c; color:#e8e8ea;
+      background:var(--bg); color:var(--ink);
       font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      overflow:hidden; /* let the bg canvas fill edge-to-edge */
+      overflow:hidden; cursor:none; /* hide system cursor */
     }
 
-    /* Background sits behind content but above body color */
+    /* BACKGROUND (constellation) */
     #bg {
-      position:fixed;
-      inset:0;
-      z-index:0;            /* <- not -1 (avoids stacking issues on some browsers) */
-      display:block;
+      position:fixed; inset:0; z-index:0; display:block;
       width:100%; height:100%;
-      background: radial-gradient(1200px 800px at 50% 40%, #0d1220 0%, #0b0b0c 60%);
+      background: radial-gradient(1200px 800px at 50% 40%, #0d1220 0%, var(--bg) 60%);
     }
 
-    /* Content on top of bg */
-    .stage { position:relative; z-index:1; display:grid; place-items:center; height:100%; padding:24px; }
-    .container { width:min(720px, 88vw); transform: translateY(8px) scale(.985); opacity:0; animation: stageIn .6s cubic-bezier(.2,.75,.2,1) .05s forwards; will-change: transform, opacity; }
-    @keyframes stageIn { to { transform: translateY(0) scale(1); opacity:1; } }
+    /* LAYOUT */
+    .stage { position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; }
+    .container { width:min(720px,88vw); opacity:0; transform:translateY(8px) scale(.985); }
+    .in { animation:fadeIn .7s cubic-bezier(.2,.75,.2,1) .1s forwards; }
+    @keyframes fadeIn { to { opacity:1; transform:translateY(0) scale(1); } }
 
     .title {
       font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
       font-weight:800; letter-spacing:.2px;
-      font-size:clamp(44px, 10vw, 96px);
+      font-size:clamp(44px,10vw,96px);
       line-height:.95; user-select:none; text-align:center;
-      margin:0 0 36px 0;
+      margin:0 0 36px 0; white-space:nowrap;
+      text-shadow:0 6px 24px rgba(61,118,255,.15);
     }
-    .blue {
-      background: linear-gradient(180deg,#6da5ff 0%,#4681ff 50%,#3a6df5 100%);
+    .blueGrad {
+      background:linear-gradient(180deg,var(--blue1) 0%,#4681ff 50%,var(--blue2) 100%);
       -webkit-background-clip:text; background-clip:text; color:transparent;
-      display:inline-block; background-size:100% 200%; animation: shimmer 4.5s ease-in-out infinite;
+      filter: drop-shadow(0 0 12px rgba(90,140,255,.18));
     }
-    .white { display:inline-block; color:#fff; text-shadow: 0 4px 18px rgba(255,255,255,.05); animation: floaty 5s ease-in-out infinite; }
-    @keyframes shimmer { 0%,100% { background-position:50% 0% } 50% { background-position:50% 100% } }
-    @keyframes floaty  { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-3px) } }
+    .typed { color:#fff; }
 
-    .hero { display:flex; flex-direction:column; align-items:center; gap:28px; }
-    .btn-cta { padding:14px 22px; border-radius:14px; }
-
-    .block { width:min(680px, 86vw); margin:0 auto; }
-    .label { font-weight:700; margin:0 0 8px 6px; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
-
+    /* TOKEN BLOCK */
+    .block { width:min(680px,86vw); margin:0 auto; }
+    .label { font-weight:700; margin:0 0 8px 6px; text-shadow:0 2px 10px rgba(0,0,0,.35); }
     .token {
       width:100%; padding:12px 14px;
-      background:#111214cc; color:#e8e8e7;
-      border:1px solid #2b2f36; border-radius:10px;
+      background:#121317cc; color:var(--ink);
+      border:1px solid var(--line); border-radius:0;
       font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.95rem;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       outline:none; backdrop-filter: blur(2px);
-      transition:border-color .2s ease, transform .2s ease;
+      transition:border-color .18s ease, transform .18s ease;
     }
-    .token:focus { border-color:#3c68ff; transform: translateY(-1px); }
+    .token:focus { border-color:#3c68ff; transform:translateY(-1px); }
 
+    /* BUTTONS (square, upgraded) */
     .controls { text-align:center; margin-top:16px; }
     .btn {
-      appearance:none; border:1px solid #2b2f36; background:#1a1b1f; color:#e8e8ea;
-      padding:10px 16px; border-radius:10px; font-weight:700; cursor:pointer;
-      transition:transform .12s ease, border-color .2s ease, box-shadow .2s ease;
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      appearance:none; border:1px solid var(--line); background:#1a1c21; color:var(--ink);
+      padding:12px 18px; border-radius:0; font-weight:700; letter-spacing:.2px; cursor:pointer;
+      transition:transform .12s ease, border-color .2s ease, box-shadow .2s ease, background .2s ease;
+      box-shadow:0 12px 28px rgba(0,0,0,.28);
     }
-    .btn:hover { transform:translateY(-1px); border-color:#3a4050; box-shadow: 0 16px 38px rgba(0,0,0,.35); }
+    .btn:hover { transform:translateY(-1px); border-color:#3a4050; background:#1f2228; box-shadow:0 16px 34px rgba(0,0,0,.36); }
+
+    .hero { display:flex; flex-direction:column; align-items:center; gap:28px; }
+    .btn-cta { padding:14px 22px; }
 
     .hide { display:none !important; }
     .muted { opacity:.72; font-size:.95rem; text-align:center; margin-top:10px; }
     .ok { color:#9ae6a0; }
     .err { color:#ff8c8c; }
+
+    /* CUSTOM CURSOR */
+    .cursor {
+      position:fixed; top:0; left:0; width:14px; height:14px; pointer-events:none; z-index:3;
+      border-radius:50%;
+      background:radial-gradient(circle at 40% 40%, #9ec0ff 0%, #4b7dff 60%, #2a4fff 100%);
+      filter: drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 24px rgba(70,120,255,.35));
+      transform: translate(-50%,-50%);
+      mix-blend-mode: screen;
+    }
+    .cursor-ring {
+      position:fixed; top:0; left:0; width:36px; height:36px; pointer-events:none; z-index:2;
+      border:1px solid rgba(110,165,255,.55); border-radius:50%;
+      filter: drop-shadow(0 0 10px rgba(110,165,255,.35));
+      transform: translate(-50%,-50%);
+    }
   </style>
 </head>
 <body>
-  <!-- Animated background -->
-  <canvas id="bg"></canvas>
+  <!-- Background -->
+  <canvas id="bg" aria-hidden="true"></canvas>
+
+  <!-- Custom Cursor -->
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="ring"></div>
 
   <div class="stage">
-    <div class="container" id="container">
-      <!-- Screen A: Sign in -->
+    <div class="container in" id="container">
+
+      <!-- Screen A -->
       <section id="screenA" class="hero">
-        <h1 class="title"><span class="blue">Plague</span><span class="white">ify</span></h1>
+        <h1 class="title" aria-live="polite">
+          <span id="titleStatic" class="blueGrad">Plague</span><span id="titleTyped" class="typed">ify</span>
+        </h1>
         <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
         <div id="statusA" class="muted"></div>
       </section>
 
-      <!-- Screen B: Token -->
+      <!-- Screen B -->
       <section id="screenB" class="hide">
-        <h1 class="title"><span class="blue">Plague</span><span class="white">ify</span></h1>
+        <h1 class="title">
+          <span class="blueGrad">Plague</span><span class="typed">ify</span>
+        </h1>
         <div class="block">
           <p class="label">Your Token</p>
           <input id="tokenBox" class="token" type="text" readonly />
@@ -104,99 +129,159 @@
           <div id="statusB" class="muted"></div>
         </div>
       </section>
+
     </div>
   </div>
 
   <script>
-    /* ================= PKCE CONFIG ================= */
-    // Hardcoded so the "not set" alert can never trigger
+    /* ===================== CONFIG ===================== */
     const CLIENT_ID    = "ec6dea15d2df46efbb5cc43de67768b3";
-    const REDIRECT_URI = "https://quaii.github.io/Plagueify/"; // EXACT in Spotify app
+    const REDIRECT_URI = "https://quaii.github.io/Plagueify/"; // must match Spotify app
     const SCOPES = "";
 
-    /* ================= Elements ================= */
+    /* ===================== ELEMENTS ===================== */
     const $ = id => document.getElementById(id);
     const screenA = $("screenA"), screenB = $("screenB");
     const statusA = $("statusA"), statusB = $("statusB");
     const btnLogin = $("btn-login"), btnCopy = $("btn-copy"), tokenBox = $("tokenBox");
-    const container = $("container");
+    const titleTyped = $("titleTyped");
+    const cursor = $("cursor"), ring = $("ring");
 
-    /* ================= Background Orbs ================= */
-    (function bgOrbs(){
+    /* ===================== BACKGROUND: CONSTELLATION ===================== */
+    (function constellation(){
       const c = document.getElementById("bg");
       const ctx = c.getContext("2d");
-      let w = innerWidth, h = innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+      let w, h, dpr;
 
       function resize(){
-        w = innerWidth; h = innerHeight;
-        c.style.width = w + "px";
-        c.style.height = h + "px";
-        c.width = Math.floor(w * dpr);
-        c.height = Math.floor(h * dpr);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // crisp scaling
+        w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
+        c.style.width = w+"px"; c.style.height = h+"px";
+        c.width = Math.floor(w*dpr); c.height = Math.floor(h*dpr);
+        ctx.setTransform(dpr,0,0,dpr,0,0);
       }
-      resize();
-      addEventListener("resize", resize);
+      resize(); addEventListener("resize", resize);
 
-      const NUM = 14;
-      const orbs = new Array(NUM).fill(0).map(()=>spawn());
-      let mouse = {x: .5, y: .4};
+      const N = 90;
+      const pts = Array.from({length:N}, ()=>({
+        x: Math.random()*w, y: Math.random()*h,
+        vx: (Math.random()-.5)*.6, vy:(Math.random()-.5)*.6
+      }));
 
-      function rand(a,b){ return a + Math.random()*(b-a); }
-      function spawn(){
-        const r = rand(90, 220);
-        return {
-          x: rand(0, w), y: rand(0, h),
-          r, a: Math.random()*Math.PI*2,
-          v: rand(.06, .18),
-          color: `hsla(${rand(210,235)}, 80%, ${rand(45,70)}%, .24)` // a bit stronger than before
-        };
-      }
+      let mx = w/2, my = h/3;
 
-      function draw(){
+      function step(){
         ctx.clearRect(0,0,w,h);
-        ctx.globalCompositeOperation = "lighter";
-        for (const o of orbs){
-          o.a += o.v * 0.01;
-          o.x += Math.cos(o.a) * 0.4;
-          o.y += Math.sin(o.a) * 0.4;
+        // glow base
+        ctx.shadowBlur = 0;
+        // draw edges
+        for (let i=0;i<N;i++){
+          const a = pts[i];
+          a.x += a.vx; a.y += a.vy;
+          if (a.x<0||a.x>w) a.vx*=-1;
+          if (a.y<0||a.y>h) a.vy*=-1;
 
-          const px = (mouse.x - 0.5) * 20;
-          const py = (mouse.y - 0.4) * 20;
-
-          const gx = ctx.createRadialGradient(o.x+px, o.y+py, 0, o.x+px, o.y+py, o.r);
-          gx.addColorStop(0, o.color);
-          gx.addColorStop(1, "hsla(0,0%,0%,0)");
-          ctx.fillStyle = gx;
-          ctx.beginPath();
-          ctx.arc(o.x+px, o.y+py, o.r, 0, Math.PI*2);
-          ctx.fill();
-
-          if (o.x < -o.r) o.x = w + o.r;
-          if (o.x > w + o.r) o.x = -o.r;
-          if (o.y < -o.r) o.y = h + o.r;
-          if (o.y > h + o.r) o.y = -o.r;
+          for (let j=i+1;j<N;j++){
+            const b = pts[j];
+            const dx = a.x-b.x, dy = a.y-b.y, d2 = dx*dx+dy*dy;
+            if (d2 < 140*140){
+              const alpha = 1 - (Math.sqrt(d2)/140);
+              ctx.strokeStyle = `rgba(90,140,255,${alpha*.25})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+            }
+          }
         }
-        requestAnimationFrame(draw);
-      }
-      draw();
+        // nodes (small glow)
+        for (const p of pts){
+          ctx.fillStyle = "rgba(120,160,255,.35)";
+          ctx.beginPath(); ctx.arc(p.x,p.y,1.2,0,Math.PI*2); ctx.fill();
+        }
+        // mouse star
+        ctx.shadowColor = "rgba(80,140,255,.5)";
+        ctx.shadowBlur = 22;
+        ctx.fillStyle = "rgba(80,140,255,.20)";
+        ctx.beginPath(); ctx.arc(mx,my,3.2,0,Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
 
-      // pointer → parallax & gentle tilt
-      const onMove = (e)=>{
-        const x = e.touches ? e.touches[0].clientX : e.clientX;
-        const y = e.touches ? e.touches[0].clientY : e.clientY;
-        mouse.x = x / innerWidth;
-        mouse.y = y / innerHeight;
-        const tiltX = (mouse.y - .5) * -6;
-        const tiltY = (mouse.x - .5) *  6;
-        container.style.transform = `rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+        requestAnimationFrame(step);
+      }
+      step();
+
+      const onMove = e=>{
+        mx = (e.touches?e.touches[0].clientX:e.clientX);
+        my = (e.touches?e.touches[0].clientY:e.clientY);
       };
-      addEventListener("pointermove", onMove, { passive:true });
-      addEventListener("touchmove", onMove, { passive:true });
-      addEventListener("pointerleave", ()=>{ container.style.transform = ""; });
+      addEventListener("pointermove", onMove, {passive:true});
+      addEventListener("touchmove", onMove, {passive:true});
     })();
 
-    /* ================= PKCE helpers ================= */
+    /* ===================== CUSTOM CURSOR ===================== */
+    (function fancyCursor(){
+      let x = innerWidth/2, y = innerHeight/2;
+      let tx = x, ty = y;
+
+      const move = e=>{
+        tx = e.touches?e.touches[0].clientX:e.clientX;
+        ty = e.touches?e.touches[0].clientY:e.clientY;
+      };
+      addEventListener("pointermove", move, {passive:true});
+      addEventListener("touchmove", move, {passive:true});
+
+      anime({
+        targets: {},
+        loop: true,
+        duration: 1000/60,
+        easing: "linear",
+        update: ()=>{
+          // springy follow
+          x += (tx - x) * 0.18;
+          y += (ty - y) * 0.18;
+          cursor.style.transform = `translate(${x}px, ${y}px)`;
+          ring.style.transform = `translate(${x}px, ${y}px)`;
+        }
+      });
+    })();
+
+    /* ===================== TITLE TYPING (anime.js) ===================== */
+    function typeSequence(){
+      const type = (text, speed=55) => new Promise(res=>{
+        titleTyped.textContent = "";
+        let i=0;
+        const t = setInterval(()=>{
+          titleTyped.textContent = text.slice(0, ++i);
+          if (i>=text.length){ clearInterval(t); res(); }
+        }, speed);
+      });
+      const backspace = (speed=38) => new Promise(res=>{
+        const t = setInterval(()=>{
+          titleTyped.textContent = titleTyped.textContent.slice(0,-1);
+          if (!titleTyped.textContent.length){ clearInterval(t); res(); }
+        }, speed);
+      });
+
+      (async ()=>{
+        // first: "plaguecheat.cc"
+        document.getElementById("titleStatic").style.visibility = "hidden"; // hide 'Plague' for first phase
+        await type("plaguecheat.cc", 60);
+        await new Promise(r=>setTimeout(r, 700));
+        await backspace(35);
+
+        // show gradient 'Plague' again, then type 'ify'
+        document.getElementById("titleStatic").style.visibility = "visible";
+        await type("ify", 90);
+
+        // subtle shimmer loop on gradient part
+        anime({
+          targets: '.blueGrad',
+          opacity: [{value:.95,duration:900},{value:1,duration:900}],
+          easing: 'easeInOutSine',
+          loop:true
+        });
+      })();
+    }
+    document.addEventListener("DOMContentLoaded", typeSequence);
+
+    /* ===================== PKCE HELPERS ===================== */
     const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
     const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
     const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
@@ -229,16 +314,24 @@
       window.addEventListener("keydown", once, { once:true });
     }
 
-    /* ================= Sign-in ================= */
-    $("btn-login")?.addEventListener("click", async ()=>{
+    /* ===================== SIGN-IN ===================== */
+    btnLogin?.addEventListener("click", async ()=>{
       const verifier = rand(64); const challenge = b64url(await sha256(verifier));
       sessionStorage.setItem("pkce_verifier", verifier);
       const state = rand(12); sessionStorage.setItem("state", state);
-      const q = new URLSearchParams({ response_type:"code", client_id:CLIENT_ID, redirect_uri:REDIRECT_URI, scope:SCOPES, code_challenge_method:"S256", code_challenge:challenge, state });
+      const q = new URLSearchParams({
+        response_type:"code",
+        client_id:CLIENT_ID,
+        redirect_uri:REDIRECT_URI,
+        scope:SCOPES,
+        code_challenge_method:"S256",
+        code_challenge:challenge,
+        state
+      });
       location.href = "https://accounts.spotify.com/authorize?" + q.toString();
     });
 
-    /* ================= Handle redirect ================= */
+    /* ===================== HANDLE REDIRECT ===================== */
     (async function handleReturn(){
       const qs = new URLSearchParams(location.search);
       if (qs.get("error")) { statusA.textContent="Authorization cancelled."; history.replaceState({}, "", REDIRECT_URI); return; }
@@ -258,13 +351,13 @@
       } catch (e) {
         statusA.textContent="Token exchange failed. Please try again."; console.error(e);
       } finally {
-        history.replaceState({}, "", REDIRECT_URI); // clean query
+        history.replaceState({}, "", REDIRECT_URI);
       }
     })();
 
-    /* ================= Manual Copy ================= */
-    $("btn-copy")?.addEventListener("click", async ()=>{
-      const ok = await robustCopy($("tokenBox").value);
+    /* ===================== MANUAL COPY ===================== */
+    btnCopy?.addEventListener("click", async ()=>{
+      const ok = await robustCopy(tokenBox.value);
       statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
       statusB.classList.toggle("ok", ok);
       statusB.classList.toggle("err", !ok);
