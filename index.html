@@ -223,23 +223,30 @@ window.addEventListener('DOMContentLoaded', () => {
       this.gain = null;
       this.ready = false;
       this.muted = true; // default off until user clicks
-      this.base = 'resources/sounds/holy-pandas';
+      // NOTE: case-sensitive path to match your repo
+      this.base = 'Resources/Sounds/holy-pandas';
 
-      // Adjust here if your filenames differ:
+      // Exact filenames from your repo (press)
       this.PRESS_FILES = {
-        space: 'space.mp3',
-        backspace: 'backspace.mp3',
-        generic: ['generic0.mp3','generic1.mp3','generic2.mp3','generic3.mp3','generic4.mp3']
+        space: 'SPACE.mp3',
+        backspace: 'BACKSPACE.mp3',
+        generic: [
+          'GENERIC_R0.mp3',
+          'GENERIC_R1.mp3',
+          'GENERIC_R2.mp3',
+          'GENERIC_R3.mp3',
+          'GENERIC_R4.mp3'
+        ]
       };
+      // Release files (uppercased names inside /release)
       this.RELEASE_FILES = {
-        space: 'release/space.mp3',
-        backspace: 'release/backspace.mp3',
-        generic: 'release/generic.mp3'
+        space: 'release/SPACE.mp3',
+        backspace: 'release/BACKSPACE.mp3',
+        generic: 'release/GENERIC.mp3'
       };
 
       this.buffers = { press:{}, release:{} };
-      // Per-key random assignment for generics so each letter has a consistent “switch”
-      this.genericIndexByKey = {};
+      this.genericIndexByKey = {}; // stable per-key random generic
     }
     async init(){
       if (this.ctx) return;
@@ -247,19 +254,24 @@ window.addEventListener('DOMContentLoaded', () => {
       this.gain = this.ctx.createGain();
       this.gain.gain.value = 0.9;
       this.gain.connect(this.ctx.destination);
-      await this.preload();
-      this.ready = true;
+      try {
+        await this.preload();
+        this.ready = true;
+      } catch (e){
+        console.warn('Audio preload failed (continuing silently):', e);
+      }
     }
     async loadBuffer(path){
       const r = await fetch(`${this.base}/${path}`);
+      if (!r.ok) throw new Error(`Fetch failed: ${path} (${r.status})`);
       const a = await r.arrayBuffer();
       return await this.ctx.decodeAudioData(a);
     }
     async preload(){
-      // Press: space, backspace
+      // Press singles
       this.buffers.press.space = await this.loadBuffer(this.PRESS_FILES.space);
       this.buffers.press.backspace = await this.loadBuffer(this.PRESS_FILES.backspace);
-      // Press generics 0..4
+      // Press generics
       this.buffers.press.generic = await Promise.all(
         this.PRESS_FILES.generic.map(p => this.loadBuffer(p))
       );
@@ -274,220 +286,9 @@ window.addEventListener('DOMContentLoaded', () => {
       muteBtn.setAttribute('aria-pressed', String(!flag));
     }
     playBuffer(buf){
-      if (!this.ready || this.muted) return;
-      const src = this.ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(this.gain);
-      src.start();
-    }
-    keyToGroup(key, isRelease){
-      // Normalize a KeyboardEvent.key or a single character from the animator
-      if (key === ' ' || key === 'Spacebar' || key === 'Space') return 'space';
-      if (key === 'Backspace') return 'backspace';
-      // We’re not using enter for now, per your note.
-      return 'generic';
-    }
-    genericIndexForKey(key){
-      // Assign each physical key a stable generic index 0..N for this session
-      if (!(key in this.genericIndexByKey)){
-        const n = this.buffers.press.generic.length;
-        this.genericIndexByKey[key] = Math.floor(Math.random()*n);
-      }
-      return this.genericIndexByKey[key];
-    }
-    press(key){
-      const group = this.keyToGroup(key, false);
-      if (group === 'generic'){
-        const idx = this.genericIndexForKey(key);
-        this.playBuffer(this.buffers.press.generic[idx]);
-      } else {
-        this.playBuffer(this.buffers.press[group]);
-      }
-    }
-    release(key){
-      const group = this.keyToGroup(key, true);
-      // release has a single generic file
-      this.playBuffer(this.buffers.release[group] || this.buffers.release.generic);
-    }
-  }
+      if (!this.ready || this.muted || !buf) return;
+      const src = this.ctx.createBufferSource
 
-  const sound = new SoundEngine();
-  const ensureAudio = async () => { await sound.init(); };
-
-  // Mute toggle: first click also resumes/initializes the AudioContext (user gesture)
-  const setMuted = m => sound.setMuted(m);
-  setMuted(true);
-  muteBtn.addEventListener('click', async ()=>{
-    await ensureAudio();
-    setMuted(!sound.muted);
-  });
-
-  // Real keyboard: play press/release
-  window.addEventListener('keydown', async (e)=>{
-    if (sound.muted) return;
-    if (!sound.ctx) await ensureAudio();
-    // Avoid auto-repeat storms feeling odd; still allow if you want repeats:
-    // if (e.repeat) return;
-    sound.press(e.key.length === 1 ? e.key : e.key); // single char or named key
-  }, {passive:true});
-
-  window.addEventListener('keyup', async (e)=>{
-    if (sound.muted) return;
-    if (!sound.ctx) await ensureAudio();
-    sound.release(e.key.length === 1 ? e.key : e.key);
-  }, {passive:true});
-
-  /* ================= Typing (suffix animation) =================
-     Replaces the old synthetic 'tap()' with Holy Pandas sounds.
-     For animated typing we simulate a quick press+release per “virtual key”.
-  */
-  (function typing(){
-    const suffixLane = document.querySelector('.suffixLane');
-    const suffix = document.getElementById('suffix');
-    const caret = document.getElementById('caret');
-
-    const measure = (text)=>{
-      const s = document.createElement('span');
-      s.style.visibility='hidden'; s.style.position='absolute'; s.style.whiteSpace='nowrap';
-      s.className = 'suffixText';
-      s.textContent = text;
-      document.body.appendChild(s);
-      const w = s.getBoundingClientRect().width;
-      document.body.removeChild(s);
-      return w;
-    };
-    const MAX_SUFFIX = 'cheat.cc';
-    suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
-
-    const sleep = ms => new Promise(r=>setTimeout(r, ms));
-    const jiggle = ()=>{ caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120); };
-
-    async function playCharSounds(ch){
-      if (sound.muted || !sound.ctx) return;
-      const key = ch === '' ? 'Backspace' : ch; // backspace handled elsewhere
-      sound.press(key);
-      setTimeout(()=>sound.release(key), 55);
-    }
-
-    async function type(text, cps){
-      const start = performance.now(); let i = 0;
-      while (i < text.length){
-        const elapsed = (performance.now()-start)/1000;
-        const target = Math.floor(elapsed*cps);
-        if (target > i){
-          i = Math.min(target, text.length);
-          const next = text.slice(0,i);
-          const ch = next[next.length-1];
-          suffix.textContent = next;
-          jiggle();
-          await ensureAudio();
-          await playCharSounds(ch);
-        }
-        await new Promise(r=>requestAnimationFrame(r));
-      }
-    }
-    async function backspace(n, cps){
-      for (let i=0;i<n;i++){
-        suffix.textContent = suffix.textContent.slice(0,-1);
-        jiggle();
-        await ensureAudio();
-        sound.press('Backspace');
-        setTimeout(()=>sound.release('Backspace'), 55);
-        await sleep(1000/cps);
-      }
-    }
-
-    async function loop(){
-      while(true){
-        suffix.textContent = '';
-        await type('cheat.cc', 7);
-        await sleep(900);
-        await backspace('cheat.cc'.length, 7);
-        await type('ify', 4);
-        await sleep(1800);
-        await backspace('ify'.length, 9);
-        await sleep(500);
-      }
-    }
-    loop();
-  })();
-
-  /* ================= OAuth (unchanged) ================= */
-  const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3";
-  const REDIRECT_URI = "https://quaii.github.io/Plagueify/";
-  const SCOPES = "";
-
-  const $ = id => document.getElementById(id);
-  const screenA = $('screenA'), screenB = $('screenB');
-  const statusA = $('statusA'), statusB = $('statusB');
-  const btnLogin = $('btn-login'), btnCopy = $('btn-copy'), tokenBox = $('tokenBox');
-
-  const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
-  const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
-
-  const go = w => (w==="A" ? (screenA.classList.remove("hide"),screenB.classList.add("hide")) : (screenA.classList.add("hide"),screenB.classList.remove("hide")));
-  function setToken(t){ tokenBox.value=t; tokenBox.addEventListener("focus",()=>tokenBox.select(),{once:true}); tokenBox.addEventListener("click",()=>tokenBox.select()); }
-  async function robustCopy(text){
-    try { await navigator.clipboard.writeText(text); return true; }
-    catch {
-      const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
-      document.body.appendChild(ta); ta.focus(); ta.select();
-      let ok=false; try{ ok=document.execCommand("copy"); }catch{} document.body.removeChild(ta); return ok;
-    }
-  }
-  async function autoCopyWithGestureFallback(text){
-    try {
-      if (await robustCopy(text)) { statusB.textContent="Copied!"; statusB.classList.remove("err"); statusB.classList.add("ok"); return; }
-    } catch {}
-    statusB.textContent="Tap anywhere or press a key to copy…";
-    const once = async () => {
-      window.removeEventListener("pointerdown", once);
-      window.removeEventListener("keydown", once);
-      const ok = await robustCopy(text);
-      statusB.textContent = ok ? "Copied!" : "Copy failed. Use Manual Copy.";
-      statusB.classList.toggle("ok", ok);
-      statusB.classList.toggle("err", !ok);
-    };
-    window.addEventListener("pointerdown", once, {once:true});
-    window.addEventListener("keydown", once, {once:true});
-  }
-
-  document.getElementById('btn-login').addEventListener('click', async ()=>{
-    const verifier = rand(64); const challenge = b64url(await sha256(verifier));
-    sessionStorage.setItem('pkce_verifier', verifier);
-    const state = rand(12); sessionStorage.setItem('state', state);
-    const q = new URLSearchParams({response_type:"code",client_id:CLIENT_ID,redirect_uri:REDIRECT_URI,scope:SCOPES,code_challenge_method:"S256",code_challenge:challenge,state});
-    location.href = "https://accounts.spotify.com/authorize?" + q.toString();
-  });
-
-  (async function handleReturn(){
-    const qs = new URLSearchParams(location.search);
-    if (qs.get("error")) { statusA.textContent="Authorization cancelled."; history.replaceState({}, "", REDIRECT_URI); return; }
-    const code = qs.get("code"), state = qs.get("state"); if (!code) return;
-    const stored = sessionStorage.getItem("state"); sessionStorage.removeItem("state");
-    if (!state || state !== stored) { statusA.textContent="State mismatch. Try again."; history.replaceState({}, "", REDIRECT_URI); return; }
-
-    try {
-      const verifier = sessionStorage.getItem("pkce_verifier") || ""; sessionStorage.removeItem("pkce_verifier");
-      const body = new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:REDIRECT_URI,client_id:CLIENT_ID,code_verifier:verifier});
-      const r = await fetch("https://accounts.spotify.com/api/token", {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
-      const tok = await r.json(); if (!r.ok) throw new Error(JSON.stringify(tok));
-      const rt = tok.refresh_token || ""; if (!rt) throw new Error("No refresh_token returned.");
-      setToken(rt); go("B"); await autoCopyWithGestureFallback(rt);
-    } catch (e) {
-      statusA.textContent="Token exchange failed. Please try again."; console.error(e);
-    } finally { history.replaceState({}, "", REDIRECT_URI); }
-  })();
-
-  document.getElementById('btn-copy')?.addEventListener('click', async ()=>{
-    const ok = await robustCopy(tokenBox.value);
-    statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
-    statusB.classList.toggle("ok", ok);
-    statusB.classList.toggle("err", !ok);
-  });
-});
-</script>
 
 </body>
 </html>
