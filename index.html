@@ -13,7 +13,7 @@
   html,body{height:100%;margin:0}
   body{background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden;cursor:none}
 
-  /* BG never blocks clicks */
+  /* BG (doesn't intercept clicks) */
   #bg{position:fixed;inset:0;z-index:0;width:100%;height:100%;display:block;pointer-events:none;
       background: radial-gradient(900px 600px at 50% 45%, #0e1322 0%, #0c0e14 40%, var(--bg) 70%);}
 
@@ -22,17 +22,22 @@
   .in{animation:fadeIn .6s cubic-bezier(.2,.75,.2,1) .05s forwards}
   @keyframes fadeIn{to{opacity:1;transform:translateY(0) scale(1)}}
 
+  /* Title */
   .title{font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:800;letter-spacing:.2px;
-         font-size:clamp(44px,10vw,96px);line-height:.95;user-select:none;text-align:center;margin:0 0 36px 0;white-space:nowrap;
-         text-shadow:0 10px 26px rgba(61,118,255,.18)}
+         font-size:clamp(44px,10vw,96px);line-height:.95;user-select:none;text-align:center;margin:0 0 36px 0;text-shadow:0 10px 26px rgba(61,118,255,.18)}
+  /* Wrap base+suffix tightly so there’s ZERO gap */
+  .titleRow{display:inline-flex;align-items:baseline;gap:0}
   .blueGrad{background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
             -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 10px rgba(90,140,255,.16))}
-  .typed{color:#fff}
-  .caret{display:inline-block;width:0.06em;background:#fff;margin-left:2px;transform:translateY(0)}
+  .suffix{color:#fff;letter-spacing:0;display:inline} /* suffix sits flush to 'Plague' */
+
+  /* caret sits flush too */
+  .caret{display:inline-block;width:0.055em;height:0.95em;background:#fff;margin:0;vertical-align:-0.05em}
   @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.15}}
   .blink{animation:blink 900ms step-end infinite}
   @keyframes jiggle{0%{transform:translateY(0)}50%{transform:translateY(-1px)}100%{transform:translateY(0)}}
 
+  /* Token UI */
   .block{width:min(680px,86vw);margin:0 auto}
   .label{font-weight:700;margin:0 0 8px 6px;text-shadow:0 2px 10px rgba(0,0,0,.35)}
   .token{width:100%;padding:12px 14px;background:#121317cc;color:var(--ink);border:1px solid var(--line);border-radius:0;
@@ -49,7 +54,7 @@
   .muted{opacity:.72;font-size:.95rem;text-align:center;margin-top:10px}
   .ok{color:#9ae6a0}.err{color:#ff8c8c}
 
-  /* Custom cursor (no transform math errors) */
+  /* Cursor: exact at pointer; ring trails slightly */
   .cursor{position:fixed;left:50%;top:50%;width:14px;height:14px;border-radius:50%;pointer-events:none;z-index:3;
           background:radial-gradient(circle at 40% 40%,#a8c4ff 0%,#5a8bff 55%,#2a4fff 100%);
           filter:drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 20px rgba(70,120,255,.35));mix-blend-mode:screen;transform:translate(-50%,-50%)}
@@ -64,11 +69,8 @@
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
 
-<!-- Custom cursor -->
 <div class="cursor" id="cursor"></div>
 <div class="cursor-ring" id="ring"></div>
-
-<!-- Mute typing sound -->
 <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default muted)">🔇 sound off</button>
 
 <div class="stage">
@@ -76,8 +78,9 @@
     <!-- Screen A -->
     <section id="screenA" class="hero">
       <h1 class="title" aria-live="polite">
-        <span id="titleStatic" class="blueGrad">Plague</span>
-        <span id="titleTyped" class="typed">ify</span><span id="caret" class="caret blink">&nbsp;</span>
+        <span class="titleRow">
+          <span id="base" class="blueGrad">Plague</span><span id="suffix" class="suffix"></span><span id="caret" class="caret blink"></span>
+        </span>
       </h1>
       <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
       <div id="statusA" class="muted"></div>
@@ -85,7 +88,7 @@
 
     <!-- Screen B -->
     <section id="screenB" class="hide">
-      <h1 class="title"><span class="blueGrad">Plague</span><span class="typed">ify</span></h1>
+      <h1 class="title"><span class="titleRow"><span class="blueGrad">Plague</span><span class="suffix">ify</span></span></h1>
       <div class="block">
         <p class="label">Your Token</p>
         <input id="tokenBox" class="token" type="text" readonly />
@@ -98,23 +101,22 @@
 
 <script>
 window.addEventListener('DOMContentLoaded', () => {
-  /* show */
   document.getElementById('container').classList.add('in');
 
-  /* ====== config ====== */
+  /* ===== CONFIG ===== */
   const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3";
   const REDIRECT_URI = "https://quaii.github.io/Plagueify/";
   const SCOPES = "";
 
-  /* ====== elements ====== */
+  /* ===== Elements ===== */
   const $ = id => document.getElementById(id);
   const screenA=$("screenA"), screenB=$("screenB");
   const statusA=$("statusA"), statusB=$("statusB");
   const btnLogin=$("btn-login"), btnCopy=$("btn-copy"), tokenBox=$("tokenBox");
-  const titleStatic=$("titleStatic"), titleTyped=$("titleTyped"), caret=$("caret");
+  const suffix=$("suffix"), caret=$("caret");
   const cursor=$("cursor"), ring=$("ring"), muteBtn=$("mute");
 
-  /* ====== BG: constellation ====== */
+  /* ===== BG: constellation ===== */
   (function bg(){
     const c=document.getElementById('bg'), ctx=c.getContext('2d');
     let w,h,dpr;
@@ -124,8 +126,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const N=90, pts=Array.from({length:N},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.55,vy:(Math.random()-.5)*.55}));
     (function step(){
       ctx.clearRect(0,0,w,h);
-      for(let i=0;i<N;i++){const a=pts[i]; a.x+=a.vx; a.y+=a.vy;
-        if(a.x<0||a.x>w) a.vx*=-1; if(a.y<0||a.y>h) a.vy*=-1;
+      for(let i=0;i<N;i++){const a=pts[i]; a.x+=a.vx; a.y+=a.vy; if(a.x<0||a.x>w) a.vx*=-1; if(a.y<0||a.y>h) a.vy*=-1;
         for(let j=i+1;j<N;j++){const b=pts[j],dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy;
           if(d2<130*130){const al=1-(Math.sqrt(d2)/130); ctx.strokeStyle=`rgba(90,140,255,${al*.22})`; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();}}
       }
@@ -134,26 +135,25 @@ window.addEventListener('DOMContentLoaded', () => {
     })();
   })();
 
-  /* ====== cursor (precise) ====== */
+  /* ===== Cursor (exact dot + eased ring) ===== */
   (function fancyCursor(){
     let x=innerWidth/2,y=innerHeight/2, tx=x, ty=y;
     const move=e=>{const t=e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY;};
     addEventListener('pointermove',move,{passive:true}); addEventListener('touchmove',move,{passive:true});
     (function tick(){
-      // dot snaps to true pointer for accuracy; ring eases for nice trail
+      // Dot: exact; Ring: eased
       x=tx; y=ty;
       cursor.style.left=x+'px'; cursor.style.top=y+'px';
       const rx=parseFloat(ring.style.left)||innerWidth/2, ry=parseFloat(ring.style.top)||innerHeight/2;
-      const nx=rx+(x-rx)*0.18, ny=ry+(y-ry)*0.18;
-      ring.style.left=nx+'px'; ring.style.top=ny+'px';
+      ring.style.left=(rx+(x-rx)*0.18)+'px'; ring.style.top=(ry+(y-ry)*0.18)+'px';
       requestAnimationFrame(tick);
     })();
   })();
 
-  /* ====== typing sequence (buttery, centered, looped) ====== */
+  /* ===== Typing: base 'Plague' is static; only suffix animates ===== */
   (function typing(){
     let audioCtx=null, muted=true;
-    const setMuted=m=>{muted=m; muteBtn.textContent=muted?"🔇 sound off":"🔊 sound on"; muteBtn.setAttribute("aria-pressed", String(!muted));};
+    const setMuted = m => { muted=m; muteBtn.textContent = muted ? "🔇 sound off" : "🔊 sound on"; muteBtn.setAttribute("aria-pressed", String(!muted)); };
     setMuted(true);
     muteBtn.addEventListener("click",()=>{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); setMuted(!muted); });
 
@@ -161,56 +161,55 @@ window.addEventListener('DOMContentLoaded', () => {
       if(muted||!audioCtx) return;
       const ctx=audioCtx, o=ctx.createOscillator(), g=ctx.createGain();
       o.type="square"; o.frequency.value=220+Math.random()*40; g.gain.value=0.07;
-      o.connect(g).connect(ctx.destination); const t=ctx.currentTime; o.start(t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.06); o.stop(t+0.07);
+      o.connect(g).connect(ctx.destination); const t=ctx.currentTime; o.start(t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.06); o.stop(t+0.07);
     };
-
-    const phase1 = "plaguecheat.cc";    // lower-case for the gag
-    const erase1 = "cheat.cc";          // part to remove
-    const phase2 = "ify";
 
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    async function typeText(text, cps=16){ // characters per second (time-based)
+    async function type(text, cps){
+      // time-based, smooth; jiggle caret each step
       const start=performance.now(); let i=0;
       while(i<text.length){
-        const t=performance.now(); const elapsed=(t-start)/1000; const target=Math.floor(elapsed*cps);
-        if(target>i){ i=Math.min(target, text.length); titleTyped.textContent=text.slice(0,i); caret.classList.add('blink'); caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120); clickTick(); }
+        const elapsed=(performance.now()-start)/1000;
+        const target=Math.floor(elapsed*cps);
+        if(target>i){
+          i=Math.min(target,text.length);
+          suffix.textContent=text.slice(0,i);
+          caret.style.animation='jiggle 110ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          clickTick();
+        }
         await new Promise(r=>requestAnimationFrame(r));
       }
     }
-    async function backspace(n, cps=18){
-      let count=n;
-      while(count>0){
-        titleTyped.textContent = titleTyped.textContent.slice(0,-1);
-        count--; caret.classList.add('blink'); caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120); clickTick();
+
+    async function backspace(count, cps){
+      let i=count;
+      while(i>0){
+        suffix.textContent = suffix.textContent.slice(0,-1);
+        i--;
+        caret.style.animation='jiggle 110ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+        clickTick();
         await sleep(1000/cps);
       }
     }
 
-    async function runLoop(){
+    async function loop(){
       while(true){
-        // phase: show only typed (hide gradient part)
-        titleStatic.style.visibility="hidden";
-        titleTyped.textContent="";
-        await typeText(phase1, 17); // ~17 cps smooth
-        await sleep(600);
-
-        // delete "cheat.cc"
-        await backspace(erase1.length, 20);
-
-        // show gradient "Plague" again, type "ify"
-        titleStatic.style.visibility="visible";
-        await typeText(phase2, 10);
+        suffix.textContent="";                      // start empty after 'Plague'
+        await type("Cheat.cc", 12);                 // type Cheat.cc (moderate)
+        await sleep(700);
+        await backspace("Cheat.cc".length, 16);     // delete all of it
+        await type("ify", 6);                       // type ify (SLOW + smooth)
         await sleep(1800);
-
-        // reset to prepare next loop
-        await backspace(phase2.length, 22);
+        await backspace("ify".length, 20);          // clear for next loop
+        await sleep(400);
       }
     }
-    runLoop();
+    loop();
   })();
 
-  /* ====== PKCE helpers and flow ====== */
+  /* ===== PKCE ===== */
   const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
   const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
@@ -241,7 +240,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window.addEventListener("keydown", once, {once:true});
   }
 
-  btnLogin.addEventListener("click", async ()=>{
+  document.getElementById("btn-login").addEventListener("click", async ()=>{
     const verifier = rand(64); const challenge = b64url(await sha256(verifier));
     sessionStorage.setItem("pkce_verifier", verifier);
     const state = rand(12); sessionStorage.setItem("state", state);
@@ -270,7 +269,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  btnCopy.addEventListener("click", async ()=>{
+  document.getElementById("btn-copy").addEventListener("click", async ()=>{
     const ok = await robustCopy(tokenBox.value);
     statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
     statusB.classList.toggle("ok", ok);
