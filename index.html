@@ -8,215 +8,315 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap" rel="stylesheet">
 <style>
-  :root{color-scheme:dark;--bg:#0b0b0c;--ink:#e8e8ea;--line:#2b2f36;--blue1:#6da5ff;--blue2:#3a6df5;--blue3:#4681ff}
-  *,*:before,*:after{box-sizing:border-box}
+  :root{
+    color-scheme:dark;
+    --bg:#0b0b0c; --ink:#e8e8ea; --line:#2b2f36;
+    --blue1:#6da5ff; --blue2:#3a6df5; --blue3:#4a82ff;
+  }
+  *,*::before,*::after{box-sizing:border-box}
   html,body{height:100%;margin:0}
-  body{background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden;cursor:none}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    overflow:hidden; cursor:none; /* we draw our own */
+  }
 
-  /* BG (doesn't intercept clicks) */
-  #bg{position:fixed;inset:0;z-index:0;width:100%;height:100%;display:block;pointer-events:none;
-      background: radial-gradient(900px 600px at 50% 45%, #0e1322 0%, #0c0e14 40%, var(--bg) 70%);}
+  /* Frosted-glass + raindrops canvas (never intercepts clicks) */
+  #bg{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none;}
 
-  .stage{position:relative;z-index:1;height:100%;display:grid;place-items:center;padding:24px}
-  .container{width:min(720px,88vw);opacity:0;transform:translateY(8px) scale(.985)}
-  .in{animation:fadeIn .6s cubic-bezier(.2,.75,.2,1) .05s forwards}
-  @keyframes fadeIn{to{opacity:1;transform:translateY(0) scale(1)}}
+  .stage{position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; overflow:visible;}
+  .container{width:min(820px,92vw); opacity:0; transform:translateY(8px) scale(.985)}
+  .in{animation:fadeIn .7s cubic-bezier(.2,.75,.2,1) .05s forwards}
+  @keyframes fadeIn{to{opacity:1; transform:translateY(0) scale(1)}}
 
   /* Title */
-  .title{font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:800;letter-spacing:.2px;
-         font-size:clamp(44px,10vw,96px);line-height:.95;user-select:none;text-align:center;margin:0 0 36px 0;text-shadow:0 10px 26px rgba(61,118,255,.18)}
-  /* Wrap base+suffix tightly so there’s ZERO gap */
-  .titleRow{display:inline-flex;align-items:baseline;gap:0}
-  .blueGrad{background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
-            -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 10px rgba(90,140,255,.16))}
-  .suffix{color:#fff;letter-spacing:0;display:inline} /* suffix sits flush to 'Plague' */
+  .title{
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    font-weight:800; letter-spacing:.2px;
+    font-size:clamp(48px,10vw,98px);
+    line-height:.95; user-select:none; text-align:center;
+    margin:0 0 36px 0; white-space:nowrap; overflow:visible;
+    text-shadow:0 0 10px rgba(90,140,255,.18); /* glow, not bloom */
+  }
+  .titleRow{display:inline-flex; align-items:baseline; gap:0; overflow:visible;}
+  .blueGrad{
+    background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 8px rgba(90,140,255,.18));
+  }
 
-  /* caret sits flush too */
-  .caret{display:inline-block;width:0.055em;height:0.95em;background:#fff;margin:0;vertical-align:-0.05em}
-  @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.15}}
-  .blink{animation:blink 900ms step-end infinite}
+  /* Suffix lane: fixed width = width of longest word so centering doesn't shift */
+  .suffixLane{
+    position:relative; display:inline-block; vertical-align:baseline;
+    min-width:10px; /* measured & set at runtime */
+  }
+  .suffixText{ color:#fff; letter-spacing:0; display:inline; }
+  .caret{
+    display:inline-block; width:0.055em; height:0.95em; background:#fff;
+    margin-left:6px; vertical-align:-0.05em;
+  }
+  @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.18}}
+  .blink{animation:blink 950ms step-end infinite}
   @keyframes jiggle{0%{transform:translateY(0)}50%{transform:translateY(-1px)}100%{transform:translateY(0)}}
 
   /* Token UI */
-  .block{width:min(680px,86vw);margin:0 auto}
-  .label{font-weight:700;margin:0 0 8px 6px;text-shadow:0 2px 10px rgba(0,0,0,.35)}
-  .token{width:100%;padding:12px 14px;background:#121317cc;color:var(--ink);border:1px solid var(--line);border-radius:0;
-         font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-         outline:none;backdrop-filter:blur(2px);transition:border-color .18s ease,transform .18s ease}
-  .token:focus{border-color:#3c68ff;transform:translateY(-1px)}
-  .controls{text-align:center;margin-top:16px}
-  .btn{appearance:none;border:1px solid var(--line);background:#1a1c21;color:var(--ink);padding:12px 18px;border-radius:0;font-weight:700;letter-spacing:.2px;cursor:pointer;
-       transition:transform .12s ease,border-color .2s ease,box-shadow .2s ease,background .2s ease;box-shadow:0 12px 28px rgba(0,0,0,.28)}
-  .btn:hover{transform:translateY(-1px);border-color:#3a4050;background:#1f2228;box-shadow:0 16px 34px rgba(0,0,0,.36)}
-  .hero{display:flex;flex-direction:column;align-items:center;gap:28px}
-  .btn-cta{padding:14px 22px}
-  .hide{display:none!important}
-  .muted{opacity:.72;font-size:.95rem;text-align:center;margin-top:10px}
-  .ok{color:#9ae6a0}.err{color:#ff8c8c}
+  .block{width:min(700px,86vw); margin:0 auto}
+  .label{font-weight:700; margin:0 0 8px 6px;}
+  .token{
+    width:100%; padding:12px 14px; background:#121317cc; color:var(--ink);
+    border:1px solid var(--line); border-radius:0;
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.95rem;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    outline:none; backdrop-filter:blur(2px);
+    transition:border-color .18s ease, transform .18s ease;
+  }
+  .token:focus{border-color:#3c68ff; transform:translateY(-1px)}
 
-  /* Cursor: exact at pointer; ring trails slightly */
-  .cursor{position:fixed;left:50%;top:50%;width:14px;height:14px;border-radius:50%;pointer-events:none;z-index:3;
-          background:radial-gradient(circle at 40% 40%,#a8c4ff 0%,#5a8bff 55%,#2a4fff 100%);
-          filter:drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 20px rgba(70,120,255,.35));mix-blend-mode:screen;transform:translate(-50%,-50%)}
-  .cursor-ring{position:fixed;left:50%;top:50%;width:34px;height:34px;border:1px solid rgba(110,165,255,.5);border-radius:50%;
-               pointer-events:none;z-index:2;filter:drop-shadow(0 0 10px rgba(110,165,255,.35));transform:translate(-50%,-50%)}
+  .controls{text-align:center; margin-top:16px}
+  .btn{
+    appearance:none; border:1px solid var(--line); background:#1a1c21; color:var(--ink);
+    padding:12px 18px; border-radius:0; font-weight:700; letter-spacing:.2px; cursor:pointer;
+    transition:transform .12s, border-color .2s, box-shadow .2s, background .2s;
+    box-shadow:0 12px 28px rgba(0,0,0,.28);
+  }
+  .btn:hover{ transform:translateY(-1px); border-color:#3a4050; background:#1f2228; box-shadow:0 16px 34px rgba(0,0,0,.36) }
+  .hero{display:flex; flex-direction:column; align-items:center; gap:28px}
+  .btn-cta{ padding:14px 22px }
 
-  .mute{position:fixed;right:14px;bottom:14px;z-index:4;background:#121317e6;color:#cfd7ff;border:1px solid #2b2f36;
-        padding:8px 10px;font-size:.85rem;letter-spacing:.2px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)}
-  .mute:hover{background:#161922}
+  .hide{display:none !important}
+  .muted{opacity:.72; font-size:.95rem; text-align:center; margin-top:10px}
+  .ok{color:#9ae6a0} .err{color:#ff8c8c}
+
+  /* Custom cursor — glow ring only */
+  .cursorRing{
+    position:fixed; left:50%; top:50%;
+    width:42px; height:42px; border-radius:50%; pointer-events:none;
+    z-index:9999; /* always above */
+    border:1px solid rgba(120,165,255,.55);
+    box-shadow:
+      0 0 20px rgba(90,140,255,.35),
+      inset 0 0 22px rgba(90,140,255,.25);
+    transform:translate(-50%,-50%);
+  }
+
+  /* Sound toggle (no icon, no native cursor) */
+  .mute{
+    position:fixed; right:14px; bottom:14px; z-index:100;
+    background:#121317e6; color:#cfd7ff; border:1px solid #2b2f36;
+    padding:8px 12px; font-size:.85rem; letter-spacing:.2px;
+    box-shadow:0 8px 22px rgba(0,0,0,.35);
+    cursor:none; /* keep native cursor hidden even over the button */
+  }
+  .mute:hover{ background:#161922 }
 </style>
 </head>
 <body>
-<canvas id="bg" aria-hidden="true"></canvas>
+  <!-- Frosted glass + raindrops -->
+  <canvas id="bg" aria-hidden="true"></canvas>
 
-<div class="cursor" id="cursor"></div>
-<div class="cursor-ring" id="ring"></div>
-<button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default muted)">🔇 sound off</button>
+  <!-- Custom glow cursor -->
+  <div class="cursorRing" id="ring"></div>
 
-<div class="stage">
-  <div class="container" id="container">
-    <!-- Screen A -->
-    <section id="screenA" class="hero">
-      <h1 class="title" aria-live="polite">
-        <span class="titleRow">
-          <span id="base" class="blueGrad">Plague</span><span id="suffix" class="suffix"></span><span id="caret" class="caret blink"></span>
-        </span>
-      </h1>
-      <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
-      <div id="statusA" class="muted"></div>
-    </section>
+  <!-- Typing sound toggle -->
+  <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default muted)">Typing sound: off</button>
 
-    <!-- Screen B -->
-    <section id="screenB" class="hide">
-      <h1 class="title"><span class="titleRow"><span class="blueGrad">Plague</span><span class="suffix">ify</span></span></h1>
-      <div class="block">
-        <p class="label">Your Token</p>
-        <input id="tokenBox" class="token" type="text" readonly />
-        <div class="controls"><button class="btn" id="btn-copy">Manual Copy</button></div>
-        <div id="statusB" class="muted"></div>
-      </div>
-    </section>
+  <div class="stage">
+    <div class="container" id="container">
+      <!-- Screen A -->
+      <section id="screenA" class="hero">
+        <h1 class="title" aria-live="polite">
+          <span class="titleRow">
+            <span class="blueGrad">Plague</span>
+            <span class="suffixLane"><span id="suffix" class="suffixText"></span></span>
+            <span id="caret" class="caret blink"></span>
+          </span>
+        </h1>
+        <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
+        <div id="statusA" class="muted"></div>
+      </section>
+
+      <!-- Screen B -->
+      <section id="screenB" class="hide">
+        <h1 class="title">
+          <span class="titleRow"><span class="blueGrad">Plague</span><span class="suffixText">ify</span></span>
+        </h1>
+        <div class="block">
+          <p class="label">Your Token</p>
+          <input id="tokenBox" class="token" type="text" readonly />
+          <div class="controls"><button class="btn" id="btn-copy">Manual Copy</button></div>
+          <div id="statusB" class="muted"></div>
+        </div>
+      </section>
+    </div>
   </div>
-</div>
 
 <script>
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('container').classList.add('in');
 
-  /* ===== CONFIG ===== */
-  const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3";
-  const REDIRECT_URI = "https://quaii.github.io/Plagueify/";
-  const SCOPES = "";
+  /* ================= Frosted glass + glowing raindrops ================= */
+  (function frosted(){
+    const c = document.getElementById('bg');
+    const ctx = c.getContext('2d');
+    let w,h,dpr, drops=[];
 
-  /* ===== Elements ===== */
-  const $ = id => document.getElementById(id);
-  const screenA=$("screenA"), screenB=$("screenB");
-  const statusA=$("statusA"), statusB=$("statusB");
-  const btnLogin=$("btn-login"), btnCopy=$("btn-copy"), tokenBox=$("tokenBox");
-  const suffix=$("suffix"), caret=$("caret");
-  const cursor=$("cursor"), ring=$("ring"), muteBtn=$("mute");
-
-  /* ===== BG: constellation ===== */
-  (function bg(){
-    const c=document.getElementById('bg'), ctx=c.getContext('2d');
-    let w,h,dpr;
-    function resize(){ w=innerWidth; h=innerHeight; dpr=Math.min(2,devicePixelRatio||1);
-      c.style.width=w+'px'; c.style.height=h+'px'; c.width=w*dpr|0; c.height=h*dpr|0; ctx.setTransform(dpr,0,0,dpr,0,0); }
-    resize(); addEventListener('resize',resize);
-    const N=90, pts=Array.from({length:N},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.55,vy:(Math.random()-.5)*.55}));
-    (function step(){
-      ctx.clearRect(0,0,w,h);
-      for(let i=0;i<N;i++){const a=pts[i]; a.x+=a.vx; a.y+=a.vy; if(a.x<0||a.x>w) a.vx*=-1; if(a.y<0||a.y>h) a.vy*=-1;
-        for(let j=i+1;j<N;j++){const b=pts[j],dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy;
-          if(d2<130*130){const al=1-(Math.sqrt(d2)/130); ctx.strokeStyle=`rgba(90,140,255,${al*.22})`; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();}}
+    function resize(){
+      w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
+      c.style.width = w+'px'; c.style.height = h+'px';
+      c.width = (w*dpr)|0; c.height = (h*dpr)|0;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      // rebuild drops
+      const count = Math.floor((w*h)/38000); // scale with screen
+      drops = new Array(count).fill(0).map(()=>spawn());
+    }
+    function spawn(){
+      const r = 1 + Math.random()*2.2;
+      return {
+        x: Math.random()*w, y: Math.random()*h,
+        r, vy: 0.3 + Math.random()*0.8, sway: (Math.random()-.5)*0.25,
+        hue: 215 + Math.random()*18, alpha: 0.18 + Math.random()*0.25
+      };
+    }
+    function drawGlass(){
+      // soft frosted plate in center
+      const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
+      g.addColorStop(0, '#0f141f');
+      g.addColorStop(1, '#0b0b0c');
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,w,h);
+    }
+    function draw(){
+      drawGlass();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const d of drops){
+        d.y += d.vy; d.x += d.sway;
+        if (d.y - d.r > h+10) { d.y = -10; d.x = Math.random()*w; }
+        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${d.alpha})`;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = `hsla(${d.hue}, 80%, 60%, ${d.alpha*0.65})`;
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
       }
-      for(const p of pts){ctx.fillStyle="rgba(120,160,255,.32)"; ctx.beginPath(); ctx.arc(p.x,p.y,1.1,0,6.283); ctx.fill();}
-      requestAnimationFrame(step);
-    })();
+      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = 'source-over';
+      requestAnimationFrame(draw);
+    }
+    resize(); addEventListener('resize', resize); draw();
   })();
 
-  /* ===== Cursor (exact dot + eased ring) ===== */
-  (function fancyCursor(){
-    let x=innerWidth/2,y=innerHeight/2, tx=x, ty=y;
-    const move=e=>{const t=e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY;};
-    addEventListener('pointermove',move,{passive:true}); addEventListener('touchmove',move,{passive:true});
+  /* ================= Precise glow cursor (ring only) ================= */
+  (function cursorRing(){
+    const ring = document.getElementById('ring');
+    let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
+    function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
+    addEventListener('pointermove', move, {passive:true});
+    addEventListener('touchmove', move, {passive:true});
     (function tick(){
-      // Dot: exact; Ring: eased
-      x=tx; y=ty;
-      cursor.style.left=x+'px'; cursor.style.top=y+'px';
-      const rx=parseFloat(ring.style.left)||innerWidth/2, ry=parseFloat(ring.style.top)||innerHeight/2;
-      ring.style.left=(rx+(x-rx)*0.18)+'px'; ring.style.top=(ry+(y-ry)*0.18)+'px';
+      rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
+      ring.style.left = rx+'px'; ring.style.top = ry+'px';
       requestAnimationFrame(tick);
     })();
   })();
 
-  /* ===== Typing: base 'Plague' is static; only suffix animates ===== */
+  /* ================= Typing (suffix only, anchored, smooth, loop) ================= */
   (function typing(){
-    let audioCtx=null, muted=true;
-    const setMuted = m => { muted=m; muteBtn.textContent = muted ? "🔇 sound off" : "🔊 sound on"; muteBtn.setAttribute("aria-pressed", String(!muted)); };
-    setMuted(true);
-    muteBtn.addEventListener("click",()=>{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); setMuted(!muted); });
+    const suffixLane = document.querySelector('.suffixLane');
+    const suffix = document.getElementById('suffix');
+    const caret = document.getElementById('caret');
+    const muteBtn = document.getElementById('mute');
 
-    const clickTick = ()=>{
-      if(muted||!audioCtx) return;
-      const ctx=audioCtx, o=ctx.createOscillator(), g=ctx.createGain();
-      o.type="square"; o.frequency.value=220+Math.random()*40; g.gain.value=0.07;
-      o.connect(g).connect(ctx.destination); const t=ctx.currentTime; o.start(t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.06); o.stop(t+0.07);
+    // Measure max width using an offscreen span so center stays steady
+    const measure = (text)=>{
+      const s = document.createElement('span');
+      s.style.visibility='hidden'; s.style.position='absolute'; s.style.whiteSpace='nowrap';
+      s.className = 'suffixText';
+      s.textContent = text;
+      document.body.appendChild(s);
+      const w = s.getBoundingClientRect().width;
+      document.body.removeChild(s);
+      return w;
     };
+    const MAX_SUFFIX = 'cheat.cc'; // lowercase 'c' per spec
+    suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
+
+    // sound (nicer tap)
+    let audioCtx=null, muted=true;
+    const setMuted = m => { muted=m; muteBtn.textContent = 'Typing sound: ' + (muted?'off':'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
+    setMuted(true);
+    muteBtn.addEventListener('click',()=>{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); setMuted(!muted); });
+
+    function tap(){
+      if (muted || !audioCtx) return;
+      const ctx = audioCtx;
+      // short filtered noise burst
+      const noise = ctx.createBufferSource();
+      const buffer = ctx.createBuffer(1, 4410, 44100); // 0.1s
+      const data = buffer.getChannelData(0);
+      for (let i=0;i<data.length;i++){ data[i] = (Math.random()*2-1) * Math.pow(1 - i/data.length, 2); }
+      noise.buffer = buffer;
+
+      const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1600; bp.Q.value=5;
+      const g = ctx.createGain(); g.gain.value = 0.08;
+
+      noise.connect(bp).connect(g).connect(ctx.destination);
+      const t = ctx.currentTime;
+      noise.start(t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.06); noise.stop(t+0.07);
+    }
 
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    async function type(text, cps){
-      // time-based, smooth; jiggle caret each step
-      const start=performance.now(); let i=0;
-      while(i<text.length){
-        const elapsed=(performance.now()-start)/1000;
-        const target=Math.floor(elapsed*cps);
-        if(target>i){
-          i=Math.min(target,text.length);
-          suffix.textContent=text.slice(0,i);
-          caret.style.animation='jiggle 110ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-          clickTick();
+    async function type(text, cps){ // time-based for buttery motion
+      const start = performance.now(); let i = 0;
+      while (i < text.length){
+        const elapsed = (performance.now()-start)/1000;
+        const target = Math.floor(elapsed*cps);
+        if (target > i){
+          i = Math.min(target, text.length);
+          suffix.textContent = text.slice(0,i);
+          caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          tap();
         }
         await new Promise(r=>requestAnimationFrame(r));
       }
     }
-
-    async function backspace(count, cps){
-      let i=count;
-      while(i>0){
+    async function backspace(n, cps){
+      for (let i=0;i<n;i++){
         suffix.textContent = suffix.textContent.slice(0,-1);
-        i--;
-        caret.style.animation='jiggle 110ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-        clickTick();
-        await sleep(1000/cps);
+        caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+        tap(); await sleep(1000/cps);
       }
     }
 
     async function loop(){
       while(true){
-        suffix.textContent="";                      // start empty after 'Plague'
-        await type("Cheat.cc", 12);                 // type Cheat.cc (moderate)
-        await sleep(700);
-        await backspace("Cheat.cc".length, 16);     // delete all of it
-        await type("ify", 6);                       // type ify (SLOW + smooth)
+        suffix.textContent = '';
+        await type('cheat.cc', 7);     // slower
+        await sleep(900);
+        await backspace('cheat.cc'.length, 7); // slow erase
+        await type('ify', 4);          // extra slow
         await sleep(1800);
-        await backspace("ify".length, 20);          // clear for next loop
-        await sleep(400);
+        await backspace('ify'.length, 9);
+        await sleep(500);
       }
     }
     loop();
   })();
 
-  /* ===== PKCE ===== */
+  /* ================= OAuth (unchanged) ================= */
+  const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3";
+  const REDIRECT_URI = "https://quaii.github.io/Plagueify/";
+  const SCOPES = "";
+
+  const $ = id => document.getElementById(id);
+  const screenA = $('screenA'), screenB = $('screenB');
+  const statusA = $('statusA'), statusB = $('statusB');
+  const btnLogin = $('btn-login'), btnCopy = $('btn-copy'), tokenBox = $('tokenBox');
+
   const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
   const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
 
   const go = w => (w==="A" ? (screenA.classList.remove("hide"),screenB.classList.add("hide")) : (screenA.classList.add("hide"),screenB.classList.remove("hide")));
   function setToken(t){ tokenBox.value=t; tokenBox.addEventListener("focus",()=>tokenBox.select(),{once:true}); tokenBox.addEventListener("click",()=>tokenBox.select()); }
-
   async function robustCopy(text){
     try { await navigator.clipboard.writeText(text); return true; }
     catch {
@@ -240,10 +340,10 @@ window.addEventListener('DOMContentLoaded', () => {
     window.addEventListener("keydown", once, {once:true});
   }
 
-  document.getElementById("btn-login").addEventListener("click", async ()=>{
+  document.getElementById('btn-login').addEventListener('click', async ()=>{
     const verifier = rand(64); const challenge = b64url(await sha256(verifier));
-    sessionStorage.setItem("pkce_verifier", verifier);
-    const state = rand(12); sessionStorage.setItem("state", state);
+    sessionStorage.setItem('pkce_verifier', verifier);
+    const state = rand(12); sessionStorage.setItem('state', state);
     const q = new URLSearchParams({response_type:"code",client_id:CLIENT_ID,redirect_uri:REDIRECT_URI,scope:SCOPES,code_challenge_method:"S256",code_challenge:challenge,state});
     location.href = "https://accounts.spotify.com/authorize?" + q.toString();
   });
@@ -264,12 +364,10 @@ window.addEventListener('DOMContentLoaded', () => {
       setToken(rt); go("B"); await autoCopyWithGestureFallback(rt);
     } catch (e) {
       statusA.textContent="Token exchange failed. Please try again."; console.error(e);
-    } finally {
-      history.replaceState({}, "", REDIRECT_URI);
-    }
+    } finally { history.replaceState({}, "", REDIRECT_URI); }
   })();
 
-  document.getElementById("btn-copy").addEventListener("click", async ()=>{
+  document.getElementById('btn-copy')?.addEventListener('click', async ()=>{
     const ok = await robustCopy(tokenBox.value);
     statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
     statusB.classList.toggle("ok", ok);
