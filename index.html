@@ -5,32 +5,31 @@
   <title>Plagueify — Refresh Token</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
-  <!-- Inter + Anime.js -->
+  <!-- Inter -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" defer></script>
-
   <style>
-    :root { color-scheme: dark; --bg:#0b0b0c; --ink:#e8e8ea; --line:#2b2f36; --blue1:#6da5ff; --blue2:#3a6df5; }
+    :root { color-scheme: dark;
+      --bg:#0b0b0c; --ink:#e8e8ea; --line:#2b2f36;
+      --blue1:#6da5ff; --blue2:#3a6df5; --blue3:#4681ff;
+    }
     *, *::before, *::after { box-sizing:border-box; }
     html, body { height:100%; margin:0; }
-    body {
-      background:var(--bg); color:var(--ink);
+    body { background:var(--bg); color:var(--ink);
       font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      overflow:hidden; cursor:none; /* hide system cursor */
+      overflow:hidden; cursor:none; /* hide system cursor (we draw our own) */
     }
 
-    /* BACKGROUND (constellation) */
+    /* BACKGROUND (constellation; subtler center glow, no giant bubble) */
     #bg {
-      position:fixed; inset:0; z-index:0; display:block;
-      width:100%; height:100%;
-      background: radial-gradient(1200px 800px at 50% 40%, #0d1220 0%, var(--bg) 60%);
+      position:fixed; inset:0; z-index:0; display:block; width:100%; height:100%;
+      background: radial-gradient(900px 600px at 50% 45%, #0e1322 0%, #0c0e14 40%, var(--bg) 70%);
     }
 
     /* LAYOUT */
     .stage { position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; }
     .container { width:min(720px,88vw); opacity:0; transform:translateY(8px) scale(.985); }
-    .in { animation:fadeIn .7s cubic-bezier(.2,.75,.2,1) .1s forwards; }
+    .in { animation:fadeIn .7s cubic-bezier(.2,.75,.2,1) .05s forwards; }
     @keyframes fadeIn { to { opacity:1; transform:translateY(0) scale(1); } }
 
     .title {
@@ -39,16 +38,16 @@
       font-size:clamp(44px,10vw,96px);
       line-height:.95; user-select:none; text-align:center;
       margin:0 0 36px 0; white-space:nowrap;
-      text-shadow:0 6px 24px rgba(61,118,255,.15);
+      text-shadow:0 10px 26px rgba(61,118,255,.18);
     }
     .blueGrad {
-      background:linear-gradient(180deg,var(--blue1) 0%,#4681ff 50%,var(--blue2) 100%);
+      background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
       -webkit-background-clip:text; background-clip:text; color:transparent;
-      filter: drop-shadow(0 0 12px rgba(90,140,255,.18));
+      filter: drop-shadow(0 0 10px rgba(90,140,255,.16));
     }
     .typed { color:#fff; }
 
-    /* TOKEN BLOCK */
+    /* TOKEN BLOCK (no big rectangle) */
     .block { width:min(680px,86vw); margin:0 auto; }
     .label { font-weight:700; margin:0 0 8px 6px; text-shadow:0 2px 10px rgba(0,0,0,.35); }
     .token {
@@ -62,7 +61,7 @@
     }
     .token:focus { border-color:#3c68ff; transform:translateY(-1px); }
 
-    /* BUTTONS (square, upgraded) */
+    /* BUTTONS (square) */
     .controls { text-align:center; margin-top:16px; }
     .btn {
       appearance:none; border:1px solid var(--line); background:#1a1c21; color:var(--ink);
@@ -71,7 +70,6 @@
       box-shadow:0 12px 28px rgba(0,0,0,.28);
     }
     .btn:hover { transform:translateY(-1px); border-color:#3a4050; background:#1f2228; box-shadow:0 16px 34px rgba(0,0,0,.36); }
-
     .hero { display:flex; flex-direction:column; align-items:center; gap:28px; }
     .btn-cta { padding:14px 22px; }
 
@@ -80,21 +78,28 @@
     .ok { color:#9ae6a0; }
     .err { color:#ff8c8c; }
 
-    /* CUSTOM CURSOR */
+    /* CUSTOM CURSOR (glowing comet) */
+    .cursor, .cursor-ring { position:fixed; top:0; left:0; pointer-events:none; transform:translate(-50%,-50%); }
     .cursor {
-      position:fixed; top:0; left:0; width:14px; height:14px; pointer-events:none; z-index:3;
-      border-radius:50%;
-      background:radial-gradient(circle at 40% 40%, #9ec0ff 0%, #4b7dff 60%, #2a4fff 100%);
-      filter: drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 24px rgba(70,120,255,.35));
-      transform: translate(-50%,-50%);
-      mix-blend-mode: screen;
+      width:14px; height:14px; border-radius:50%;
+      background:radial-gradient(circle at 40% 40%, #a8c4ff 0%, #5a8bff 55%, #2a4fff 100%);
+      filter: drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 20px rgba(70,120,255,.35));
+      z-index:3; mix-blend-mode:screen;
     }
     .cursor-ring {
-      position:fixed; top:0; left:0; width:36px; height:36px; pointer-events:none; z-index:2;
-      border:1px solid rgba(110,165,255,.55); border-radius:50%;
+      width:34px; height:34px; border:1px solid rgba(110,165,255,.5); border-radius:50%;
       filter: drop-shadow(0 0 10px rgba(110,165,255,.35));
-      transform: translate(-50%,-50%);
+      z-index:2;
     }
+
+    /* MUTE TOGGLE */
+    .mute {
+      position:fixed; right:14px; bottom:14px; z-index:4;
+      background:#121317e6; color:#cfd7ff; border:1px solid #2b2f36;
+      padding:8px 10px; font-size:.85rem; letter-spacing:.2px; cursor:pointer;
+      box-shadow:0 8px 22px rgba(0,0,0,.35);
+    }
+    .mute:hover { background:#161922; }
   </style>
 </head>
 <body>
@@ -104,6 +109,9 @@
   <!-- Custom Cursor -->
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="ring"></div>
+
+  <!-- Mute toggle for typing sound -->
+  <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default muted)">🔇 sound off</button>
 
   <div class="stage">
     <div class="container in" id="container">
@@ -144,8 +152,8 @@
     const screenA = $("screenA"), screenB = $("screenB");
     const statusA = $("statusA"), statusB = $("statusB");
     const btnLogin = $("btn-login"), btnCopy = $("btn-copy"), tokenBox = $("tokenBox");
-    const titleTyped = $("titleTyped");
-    const cursor = $("cursor"), ring = $("ring");
+    const titleStatic = $("titleStatic"), titleTyped = $("titleTyped");
+    const cursor = $("cursor"), ring = $("ring"), muteBtn = $("mute");
 
     /* ===================== BACKGROUND: CONSTELLATION ===================== */
     (function constellation(){
@@ -164,16 +172,13 @@
       const N = 90;
       const pts = Array.from({length:N}, ()=>({
         x: Math.random()*w, y: Math.random()*h,
-        vx: (Math.random()-.5)*.6, vy:(Math.random()-.5)*.6
+        vx: (Math.random()-.5)*.55, vy:(Math.random()-.5)*.55
       }));
-
-      let mx = w/2, my = h/3;
 
       function step(){
         ctx.clearRect(0,0,w,h);
-        // glow base
-        ctx.shadowBlur = 0;
-        // draw edges
+
+        // links
         for (let i=0;i<N;i++){
           const a = pts[i];
           a.x += a.vx; a.y += a.vy;
@@ -183,39 +188,26 @@
           for (let j=i+1;j<N;j++){
             const b = pts[j];
             const dx = a.x-b.x, dy = a.y-b.y, d2 = dx*dx+dy*dy;
-            if (d2 < 140*140){
-              const alpha = 1 - (Math.sqrt(d2)/140);
-              ctx.strokeStyle = `rgba(90,140,255,${alpha*.25})`;
+            if (d2 < 130*130){
+              const alpha = 1 - (Math.sqrt(d2)/130);
+              ctx.strokeStyle = `rgba(90,140,255,${alpha*.22})`;
               ctx.lineWidth = 1;
               ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
             }
           }
         }
-        // nodes (small glow)
-        for (const p of pts){
-          ctx.fillStyle = "rgba(120,160,255,.35)";
-          ctx.beginPath(); ctx.arc(p.x,p.y,1.2,0,Math.PI*2); ctx.fill();
-        }
-        // mouse star
-        ctx.shadowColor = "rgba(80,140,255,.5)";
-        ctx.shadowBlur = 22;
-        ctx.fillStyle = "rgba(80,140,255,.20)";
-        ctx.beginPath(); ctx.arc(mx,my,3.2,0,Math.PI*2); ctx.fill();
-        ctx.shadowBlur = 0;
 
+        // nodes
+        for (const p of pts){
+          ctx.fillStyle = "rgba(120,160,255,.32)";
+          ctx.beginPath(); ctx.arc(p.x,p.y,1.1,0,Math.PI*2); ctx.fill();
+        }
         requestAnimationFrame(step);
       }
       step();
-
-      const onMove = e=>{
-        mx = (e.touches?e.touches[0].clientX:e.clientX);
-        my = (e.touches?e.touches[0].clientY:e.clientY);
-      };
-      addEventListener("pointermove", onMove, {passive:true});
-      addEventListener("touchmove", onMove, {passive:true});
     })();
 
-    /* ===================== CUSTOM CURSOR ===================== */
+    /* ===================== CUSTOM CURSOR (RAF loop) ===================== */
     (function fancyCursor(){
       let x = innerWidth/2, y = innerHeight/2;
       let tx = x, ty = y;
@@ -227,59 +219,81 @@
       addEventListener("pointermove", move, {passive:true});
       addEventListener("touchmove", move, {passive:true});
 
-      anime({
-        targets: {},
-        loop: true,
-        duration: 1000/60,
-        easing: "linear",
-        update: ()=>{
-          // springy follow
-          x += (tx - x) * 0.18;
-          y += (ty - y) * 0.18;
-          cursor.style.transform = `translate(${x}px, ${y}px)`;
-          ring.style.transform = `translate(${x}px, ${y}px)`;
-        }
-      });
+      (function tick(){
+        x += (tx - x) * 0.18;
+        y += (ty - y) * 0.18;
+        const t = `translate(${x}px, ${y}px) translate(-50%,-50%)`;
+        cursor.style.transform = t;
+        ring.style.transform = t;
+        requestAnimationFrame(tick);
+      })();
     })();
 
-    /* ===================== TITLE TYPING (anime.js) ===================== */
-    function typeSequence(){
-      const type = (text, speed=55) => new Promise(res=>{
+    /* ===================== TYPING with optional SOUND ===================== */
+    const typer = (() => {
+      let audioCtx = null, muted = true;
+      const setMuted = (m) => {
+        muted = m;
+        muteBtn.textContent = muted ? "🔇 sound off" : "🔊 sound on";
+        muteBtn.setAttribute("aria-pressed", String(!muted));
+      };
+      setMuted(true);
+
+      muteBtn.addEventListener("click", () => {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        setMuted(!muted);
+      });
+
+      function clickTick() {
+        if (muted) return;
+        if (!audioCtx) return;
+        const ctx = audioCtx;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = "square"; o.frequency.value = 220 + Math.random()*40;
+        g.gain.value = 0.08;
+        o.connect(g).connect(ctx.destination);
+        const now = ctx.currentTime;
+        o.start(now);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+        o.stop(now + 0.07);
+      }
+
+      async function type(text, speed=55) {
         titleTyped.textContent = "";
-        let i=0;
-        const t = setInterval(()=>{
-          titleTyped.textContent = text.slice(0, ++i);
-          if (i>=text.length){ clearInterval(t); res(); }
-        }, speed);
-      });
-      const backspace = (speed=38) => new Promise(res=>{
-        const t = setInterval(()=>{
-          titleTyped.textContent = titleTyped.textContent.slice(0,-1);
-          if (!titleTyped.textContent.length){ clearInterval(t); res(); }
-        }, speed);
-      });
-
-      (async ()=>{
-        // first: "plaguecheat.cc"
-        document.getElementById("titleStatic").style.visibility = "hidden"; // hide 'Plague' for first phase
+        for (let i=0;i<text.length;i++){
+          titleTyped.textContent = text.slice(0, i+1);
+          clickTick();
+          await new Promise(r=>setTimeout(r, speed));
+        }
+      }
+      async function backspace(speed=38) {
+        let s = titleTyped.textContent;
+        while (s.length) {
+          s = s.slice(0,-1);
+          titleTyped.textContent = s;
+          clickTick();
+          await new Promise(r=>setTimeout(r, speed));
+        }
+      }
+      async function run() {
+        // first phase
+        titleStatic.style.visibility = "hidden";
         await type("plaguecheat.cc", 60);
-        await new Promise(r=>setTimeout(r, 700));
-        await backspace(35);
+        await new Promise(r=>setTimeout(r, 600));
+        await backspace(32);
 
-        // show gradient 'Plague' again, then type 'ify'
-        document.getElementById("titleStatic").style.visibility = "visible";
+        // second phase
+        titleStatic.style.visibility = "visible";
         await type("ify", 90);
+      }
+      return { run };
+    })();
 
-        // subtle shimmer loop on gradient part
-        anime({
-          targets: '.blueGrad',
-          opacity: [{value:.95,duration:900},{value:1,duration:900}],
-          easing: 'easeInOutSine',
-          loop:true
-        });
-      })();
-    }
-    document.addEventListener("DOMContentLoaded", typeSequence);
+    // ensure it runs even if DOM already loaded
+    (document.readyState === "loading")
+      ? document.addEventListener("DOMContentLoaded", () => typer.run())
+      : typer.run();
 
     /* ===================== PKCE HELPERS ===================== */
     const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
