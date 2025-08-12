@@ -279,6 +279,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // sound (sample-based using holy-pandas set)
     let audioCtx = null, masterGain = null, muted = true;
+    let audioReady = false;
+    const soundQueue = [];
     const audioEls = new Map(); // HTMLAudio fallback per key
     const setMuted = m => { muted = m; muteBtn.textContent = 'Typing sound: ' + (muted ? 'off' : 'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
     setMuted(false);
@@ -371,20 +373,23 @@ window.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => playBuffer(name, 0.8), delayMs);
     }
 
-    function playPressForChar(ch){
-      if (ch === ' '){
-        playBuffer('SPACE');
-        scheduleRelease('release/SPACE');
-      } else {
-        const idx = (Math.random()*5)|0; // 0..4
-        playBuffer('GENERIC_R'+idx);
-        scheduleRelease('release/GENERIC');
-      }
+    function playCharSound(ch){
+      const play = () => {
+        if (ch === ' '){
+          playBuffer('SPACE');
+          scheduleRelease('release/SPACE');
+        } else {
+          const idx = (Math.random()*5)|0;
+          playBuffer('GENERIC_R'+idx);
+          scheduleRelease('release/GENERIC');
+        }
+      };
+      if (audioReady) play(); else soundQueue.push(play);
     }
 
-    function playBackspace(){
-      playBuffer('BACKSPACE');
-      scheduleRelease('release/BACKSPACE');
+    function playBackspaceSound(){
+      const play = () => { playBuffer('BACKSPACE'); scheduleRelease('release/BACKSPACE'); };
+      if (audioReady) play(); else soundQueue.push(play);
     }
 
     function testPing(){
@@ -401,25 +406,19 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!nowMuted) { testPing(); }
     });
 
-    // Warm up audio on first real user interaction (no pointermove)
-    async function warmup(){
+    // One-time audio unlock based on real gestures
+    async function enableAudio(){
       await ensureAudio();
       try { await audioCtx.resume(); } catch {}
-      if (audioCtx && audioCtx.state === 'running') {
-        testPing();
-        cleanupWarmup();
+      audioReady = !!(audioCtx && audioCtx.state === 'running');
+      if (audioReady) {
+        // flush queued sounds
+        soundQueue.splice(0).forEach(fn => { try { fn(); } catch {} });
       }
     }
-    function cleanupWarmup(){
-      window.removeEventListener('pointerdown', warmup);
-      window.removeEventListener('click', warmup);
-      window.removeEventListener('touchstart', warmup);
-      window.removeEventListener('keydown', warmup);
-    }
-    window.addEventListener('pointerdown', warmup, { passive: true });
-    window.addEventListener('click', warmup, { passive: true });
-    window.addEventListener('touchstart', warmup, { passive: true });
-    window.addEventListener('keydown', warmup);
+    ;['click','touchstart','keydown','wheel','scroll','pointerdown'].forEach(t =>
+      window.addEventListener(t, enableAudio, { passive:true, once:true })
+    );
 
     // Volume interactions
     function setVolumeFromClientY(clientY){
@@ -470,9 +469,7 @@ window.addEventListener('DOMContentLoaded', () => {
           i++;
           suffix.textContent = text.slice(0,i);
           caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-          // Fire-and-forget ensure to reduce first-play latency
-          if (!buffersLoaded && !buffersLoadingPromise) { ensureAudio(); }
-          playPressForChar(ch);
+          playCharSound(ch);
         }
         await new Promise(r=>requestAnimationFrame(r));
       }
@@ -481,8 +478,7 @@ window.addEventListener('DOMContentLoaded', () => {
       for (let i=0;i<n;i++){
         suffix.textContent = suffix.textContent.slice(0,-1);
         caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-        if (!buffersLoaded && !buffersLoadingPromise) { ensureAudio(); }
-        playBackspace();
+        playBackspaceSound();
         await sleep(1000/cps);
       }
     }
@@ -578,3 +574,4 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
