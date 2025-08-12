@@ -165,7 +165,8 @@ window.addEventListener('DOMContentLoaded', () => {
       c.style.width = w+'px'; c.style.height = h+'px';
       c.width = (w*dpr)|0; c.height = (h*dpr)|0;
       ctx.setTransform(dpr,0,0,dpr,0,0);
-      const count = Math.floor((w*h)/38000);
+      // rebuild drops
+      const count = Math.floor((w*h)/38000); // scale with screen
       drops = new Array(count).fill(0).map(()=>spawn());
     }
     function spawn(){
@@ -177,6 +178,7 @@ window.addEventListener('DOMContentLoaded', () => {
       };
     }
     function drawGlass(){
+      // soft frosted plate in center
       const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
       g.addColorStop(0, '#0f141f');
       g.addColorStop(1, '#0b0b0c');
@@ -215,85 +217,222 @@ window.addEventListener('DOMContentLoaded', () => {
     })();
   })();
 
-  /* ================= Sound engine (Holy Pandas) ================= */
-  const muteBtn = document.getElementById('mute');
-  class SoundEngine {
-    constructor(){
-      this.ctx = null;
-      this.gain = null;
-      this.ready = false;
-      this.muted = true; // default off until user clicks
-      // NOTE: case-sensitive path to match your repo
-      this.base = 'Resources/Sounds/holy-pandas';
+  /* ================= Typing (suffix only, anchored, smooth, loop) ================= */
+  (function typing(){
+    const suffixLane = document.querySelector('.suffixLane');
+    const suffix = document.getElementById('suffix');
+    const caret = document.getElementById('caret');
+    const muteBtn = document.getElementById('mute');
 
-      // Exact filenames from your repo (press)
-      this.PRESS_FILES = {
-        space: 'SPACE.mp3',
-        backspace: 'BACKSPACE.mp3',
-        generic: [
-          'GENERIC_R0.mp3',
-          'GENERIC_R1.mp3',
-          'GENERIC_R2.mp3',
-          'GENERIC_R3.mp3',
-          'GENERIC_R4.mp3'
-        ]
-      };
-      // Release files (uppercased names inside /release)
-      this.RELEASE_FILES = {
-        space: 'release/SPACE.mp3',
-        backspace: 'release/BACKSPACE.mp3',
-        generic: 'release/GENERIC.mp3'
-      };
+    // Measure max width using an offscreen span so center stays steady
+    const measure = (text)=>{
+      const s = document.createElement('span');
+      s.style.visibility='hidden'; s.style.position='absolute'; s.style.whiteSpace='nowrap';
+      s.className = 'suffixText';
+      s.textContent = text;
+      document.body.appendChild(s);
+      const w = s.getBoundingClientRect().width;
+      document.body.removeChild(s);
+      return w;
+    };
+    const MAX_SUFFIX = 'cheat.cc'; // lowercase 'c' per spec
+    suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
 
-      this.buffers = { press:{}, release:{} };
-      this.genericIndexByKey = {}; // stable per-key random generic
+    // sound (sample-based using holy-pandas set)
+    let audioCtx = null, muted = true;
+    const setMuted = m => { muted = m; muteBtn.textContent = 'Typing sound: ' + (muted ? 'off' : 'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
+    setMuted(true);
+
+    const basePath = 'resources/sounds/holy-pandas/';
+    const soundPaths = {
+      'SPACE': basePath + 'SPACE.mp3',
+      'BACKSPACE': basePath + 'BACKSPACE.mp3',
+      'ENTER': basePath + 'ENTER.mp3',
+      'GENERIC_R0': basePath + 'GENERIC_R0.mp3',
+      'GENERIC_R1': basePath + 'GENERIC_R1.mp3',
+      'GENERIC_R2': basePath + 'GENERIC_R2.mp3',
+      'GENERIC_R3': basePath + 'GENERIC_R3.mp3',
+      'GENERIC_R4': basePath + 'GENERIC_R4.mp3',
+      'release/SPACE': basePath + 'release/SPACE.mp3',
+      'release/BACKSPACE': basePath + 'release/BACKSPACE.mp3',
+      'release/ENTER': basePath + 'release/ENTER.mp3',
+      'release/GENERIC': basePath + 'release/GENERIC.mp3'
+    };
+    const buffers = new Map();
+    let buffersLoaded = false, buffersLoadingPromise = null;
+
+    async function ensureAudio(){
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (buffersLoaded) return;
+      if (!buffersLoadingPromise) {
+        const entries = Object.entries(soundPaths);
+        buffersLoadingPromise = Promise.all(entries.map(async ([key, url]) => {
+          try {
+            const res = await fetch(url);
+            const arr = await res.arrayBuffer();
+            const buf = await audioCtx.decodeAudioData(arr);
+            buffers.set(key, buf);
+          } catch (e) {
+            // If a file is missing, skip silently
+          }
+        })).then(() => { buffersLoaded = true; });
+      }
+      await buffersLoadingPromise;
     }
-    async init(){
-      if (this.ctx) return;
-      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
-      this.gain = this.ctx.createGain();
-      this.gain.gain.value = 0.9;
-      this.gain.connect(this.ctx.destination);
-      try {
-        await this.preload();
-        this.ready = true;
-      } catch (e){
-        console.warn('Audio preload failed (continuing silently):', e);
+
+    function playBuffer(name, volume = 0.8){
+      if (muted || !audioCtx) return;
+      const buf = buffers.get(name);
+      if (!buf) return;
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      const g = audioCtx.createGain();
+      g.gain.value = volume;
+      src.connect(g).connect(audioCtx.destination);
+      src.start();
+    }
+
+    function scheduleRelease(name){
+      const delayMs = 85 + Math.random()*40; // slight variability
+      setTimeout(() => playBuffer(name, 0.8), delayMs);
+    }
+
+    function playPressForChar(ch){
+      if (ch === ' '){
+        playBuffer('SPACE');
+        scheduleRelease('release/SPACE');
+      } else {
+        const idx = (Math.random()*5)|0; // 0..4
+        playBuffer('GENERIC_R'+idx);
+        scheduleRelease('release/GENERIC');
       }
     }
-    async loadBuffer(path){
-      const r = await fetch(`${this.base}/${path}`);
-      if (!r.ok) throw new Error(`Fetch failed: ${path} (${r.status})`);
-      const a = await r.arrayBuffer();
-      return await this.ctx.decodeAudioData(a);
-    }
-    async preload(){
-      // Press singles
-      this.buffers.press.space = await this.loadBuffer(this.PRESS_FILES.space);
-      this.buffers.press.backspace = await this.loadBuffer(this.PRESS_FILES.backspace);
-      // Press generics
-      this.buffers.press.generic = await Promise.all(
-        this.PRESS_FILES.generic.map(p => this.loadBuffer(p))
-      );
-      // Release
-      this.buffers.release.space = await this.loadBuffer(this.RELEASE_FILES.space);
-      this.buffers.release.backspace = await this.loadBuffer(this.RELEASE_FILES.backspace);
-      this.buffers.release.generic = await this.loadBuffer(this.RELEASE_FILES.generic);
-    }
-    setMuted(flag){
-      this.muted = flag;
-      muteBtn.textContent = 'Typing sound: ' + (flag ? 'off' : 'on');
-      muteBtn.setAttribute('aria-pressed', String(!flag));
-    }
-    playBuffer(buf){
-      if (!this.ready || this.muted || !buf) return;
-      const src = this.ctx.createBufferSource
 
+    function playBackspace(){
+      playBuffer('BACKSPACE');
+      scheduleRelease('release/BACKSPACE');
+    }
 
+    muteBtn.addEventListener('click', async () => {
+      await ensureAudio();
+      setMuted(!muted);
+    });
+
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+
+    async function type(text, cps){ // time-based, but play a sound per character
+      const start = performance.now(); let i = 0;
+      while (i < text.length){
+        const elapsed = (performance.now()-start)/1000;
+        const target = Math.floor(elapsed*cps);
+        const next = Math.min(target, text.length);
+        while (i < next){
+          const ch = text[i];
+          i++;
+          suffix.textContent = text.slice(0,i);
+          caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          playPressForChar(ch);
+        }
+        await new Promise(r=>requestAnimationFrame(r));
+      }
+    }
+    async function backspace(n, cps){
+      for (let i=0;i<n;i++){
+        suffix.textContent = suffix.textContent.slice(0,-1);
+        caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+        playBackspace();
+        await sleep(1000/cps);
+      }
+    }
+
+    async function loop(){
+      while(true){
+        suffix.textContent = '';
+        await type('cheat.cc', 7);     // slower
+        await sleep(900);
+        await backspace('cheat.cc'.length, 7); // slow erase
+        await type('ify', 4);          // extra slow
+        await sleep(1800);
+        await backspace('ify'.length, 9);
+        await sleep(500);
+      }
+    }
+    loop();
+  })();
+
+  /* ================= OAuth (unchanged) ================= */
+  const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3";
+  const REDIRECT_URI = "https://quaii.github.io/Plagueify/";
+  const SCOPES = "";
+
+  const $ = id => document.getElementById(id);
+  const screenA = $('screenA'), screenB = $('screenB');
+  const statusA = $('statusA'), statusB = $('statusB');
+  const btnLogin = $('btn-login'), btnCopy = $('btn-copy'), tokenBox = $('tokenBox');
+
+  const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
+  const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+
+  const go = w => (w==="A" ? (screenA.classList.remove("hide"),screenB.classList.add("hide")) : (screenA.classList.add("hide"),screenB.classList.remove("hide")));
+  function setToken(t){ tokenBox.value=t; tokenBox.addEventListener("focus",()=>tokenBox.select(),{once:true}); tokenBox.addEventListener("click",()=>tokenBox.select()); }
+  async function robustCopy(text){
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch {
+      const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      let ok=false; try{ ok=document.execCommand("copy"); }catch{} document.body.removeChild(ta); return ok;
+    }
+  }
+  async function autoCopyWithGestureFallback(text){
+    if (await robustCopy(text)) { statusB.textContent="Copied!"; statusB.classList.remove("err"); statusB.classList.add("ok"); return; }
+    statusB.textContent="Tap anywhere or press a key to copy…";
+    const once = async () => {
+      window.removeEventListener("pointerdown", once);
+      window.removeEventListener("keydown", once);
+      const ok = await robustCopy(text);
+      statusB.textContent = ok ? "Copied!" : "Copy failed. Use Manual Copy.";
+      statusB.classList.toggle("ok", ok);
+      statusB.classList.toggle("err", !ok);
+    };
+    window.addEventListener("pointerdown", once, {once:true});
+    window.addEventListener("keydown", once, {once:true});
+  }
+
+  document.getElementById('btn-login').addEventListener('click', async ()=>{
+    const verifier = rand(64); const challenge = b64url(await sha256(verifier));
+    sessionStorage.setItem('pkce_verifier', verifier);
+    const state = rand(12); sessionStorage.setItem('state', state);
+    const q = new URLSearchParams({response_type:"code",client_id:CLIENT_ID,redirect_uri:REDIRECT_URI,scope:SCOPES,code_challenge_method:"S256",code_challenge:challenge,state});
+    location.href = "https://accounts.spotify.com/authorize?" + q.toString();
+  });
+
+  (async function handleReturn(){
+    const qs = new URLSearchParams(location.search);
+    if (qs.get("error")) { statusA.textContent="Authorization cancelled."; history.replaceState({}, "", REDIRECT_URI); return; }
+    const code = qs.get("code"), state = qs.get("state"); if (!code) return;
+    const stored = sessionStorage.getItem("state"); sessionStorage.removeItem("state");
+    if (!state || state !== stored) { statusA.textContent="State mismatch. Try again."; history.replaceState({}, "", REDIRECT_URI); return; }
+
+    try {
+      const verifier = sessionStorage.getItem("pkce_verifier") || ""; sessionStorage.removeItem("pkce_verifier");
+      const body = new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:REDIRECT_URI,client_id:CLIENT_ID,code_verifier:verifier});
+      const r = await fetch("https://accounts.spotify.com/api/token", {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+      const tok = await r.json(); if (!r.ok) throw new Error(JSON.stringify(tok));
+      const rt = tok.refresh_token || ""; if (!rt) throw new Error("No refresh_token returned.");
+      setToken(rt); go("B"); await autoCopyWithGestureFallback(rt);
+    } catch (e) {
+      statusA.textContent="Token exchange failed. Please try again."; console.error(e);
+    } finally { history.replaceState({}, "", REDIRECT_URI); }
+  })();
+
+  document.getElementById('btn-copy')?.addEventListener('click', async ()=>{
+    const ok = await robustCopy(tokenBox.value);
+    statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
+    statusB.classList.toggle("ok", ok);
+    statusB.classList.toggle("err", !ok);
+  });
+});
+</script>
 </body>
 </html>
-
-
-
-
-
