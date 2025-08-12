@@ -10,20 +10,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: dark; }
+    *, *::before, *::after { box-sizing: border-box; }
     html, body { height:100%; margin:0; }
     body {
       background:#0b0b0c; color:#e8e8ea;
       display:grid; place-items:center;
       font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
     }
-    .wrap { width:min(980px,92vw); padding:24px; }
 
-    /* Title */
+    /* layout */
+    .container { width:min(720px, 88vw); margin:0 auto; }
     .title {
       font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
       font-weight:800; letter-spacing:.2px;
-      font-size:clamp(38px,8vw,76px); line-height:.95; user-select:none;
-      text-align:center; margin-bottom:28px;
+      font-size:clamp(44px, 10vw, 96px);
+      line-height:.95; user-select:none;
+      text-align:center; margin: 0 0 36px 0;
     }
     .blue {
       background:linear-gradient(180deg,#6da5ff 0%,#4681ff 50%,#3a6df5 100%);
@@ -31,225 +33,159 @@
     }
     .white { color:#fff; }
 
-    /* Card */
-    .card { background:#14161a; border:1px solid #262b31; border-radius:14px; padding:22px; }
-    .label { font-weight:700; margin-bottom:8px; }
+    /* token block (no background rectangle) */
+    .block { width:min(680px, 86vw); margin: 0 auto; }
+    .label { font-weight:700; margin:0 0 8px 6px; }
 
-    /* Token field: single-line with ellipsis */
+    /* single-line pill input with ellipsis */
     .token {
       width:100%;
       padding:12px 14px;
-      background:#0f1114; color:#e8e8e7;
-      border:1px solid #262b31; border-radius:10px;
-      font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.95rem;
+      background:#111214; color:#e8e8e7;
+      border:1px solid #2b2f36; border-radius:10px;
+      font-family:ui-monospace, Menlo, Consolas, monospace;
+      font-size:.95rem;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      outline:none; /* avoid weird clipping on focus */
     }
-    .controls { text-align:center; margin-top:14px; }
+    .token:focus { border-color:#3a4050; }
 
+    .controls { text-align:center; margin-top:16px; }
     .btn {
-      appearance:none; border:1px solid #27272b; background:#1a1b1f; color:#e8e8ea;
-      border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer;
-      transition:transform .12s ease, box-shadow .2s ease, border-color .2s ease;
+      appearance:none;
+      border:1px solid #2b2f36; background:#1a1b1f; color:#e8e8ea;
+      padding:10px 16px; border-radius:10px; font-weight:700; cursor:pointer;
+      transition:transform .12s ease, border-color .2s ease;
     }
-    .btn:hover { transform:translateY(-1px); border-color:#2f2f36; }
-    .muted { opacity:.72; font-size:.95rem; text-align:center; margin-top:10px; }
+    .btn:hover { transform:translateY(-1px); border-color:#323744; }
 
-    /* First screen */
-    .hero { display:flex; flex-direction:column; align-items:center; gap:26px; }
+    /* sign-in screen */
+    .hero { display:flex; flex-direction:column; align-items:center; gap:28px; }
     .btn-cta { padding:14px 22px; border-radius:14px; }
 
-    /* Panels */
+    /* states */
     .hide { display:none !important; }
+    .muted { opacity:.72; font-size:.95rem; text-align:center; margin-top:10px; }
+    .ok { color:#9ae6a0; }
+    .err { color:#ff8c8c; }
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="container">
+
     <!-- Screen A: Sign in -->
-    <div id="screenA" class="hero">
-      <div class="title"><span class="blue">Plague</span><span class="white">ify</span></div>
+    <section id="screenA" class="hero">
+      <h1 class="title"><span class="blue">Plague</span><span class="white">ify</span></h1>
       <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
       <div id="statusA" class="muted"></div>
-    </div>
+    </section>
 
-    <!-- Screen B: Token result -->
-    <div id="screenB" class="hide">
-      <div class="title"><span class="blue">Plague</span><span class="white">ify</span></div>
-      <div class="card">
-        <div class="label">Your Token</div>
+    <!-- Screen B: Token (matches your mock: no extra background rectangle) -->
+    <section id="screenB" class="hide">
+      <h1 class="title"><span class="blue">Plague</span><span class="white">ify</span></h1>
+      <div class="block">
+        <p class="label">Your Token</p>
         <input id="tokenBox" class="token" type="text" readonly />
         <div class="controls">
           <button class="btn" id="btn-copy">Manual Copy</button>
         </div>
+        <div id="statusB" class="muted"></div>
       </div>
-      <div id="statusB" class="muted"></div>
-    </div>
+    </section>
+
   </div>
 
   <script>
     /* ===== CONFIG ===== */
-    const CLIENT_ID   = "ec6dea15d2df46efbb5cc43de67768b3"; // your client id
-    const REDIRECT_URI = "https://quaii.github.io/Plagueify/"; // EXACTLY as in Spotify app
-    const SCOPES = ""; // we just need a refresh token, so no extra scopes
+    const CLIENT_ID    = "__CLIENT_ID__"; // inject via build, or paste your client id
+    const REDIRECT_URI = "https://quaii.github.io/Plagueify/"; // must match Spotify app
+    const SCOPES = ""; // none needed to mint a refresh token
 
     /* ===== Elements ===== */
     const $ = id => document.getElementById(id);
-    const screenA = $("screenA");
-    const screenB = $("screenB");
-    const statusA = $("statusA");
-    const statusB = $("statusB");
-    const btnLogin = $("btn-login");
-    const btnCopy = $("btn-copy");
-    const tokenBox = $("tokenBox");
+    const screenA = $("screenA"), screenB = $("screenB");
+    const statusA = $("statusA"), statusB = $("statusB");
+    const btnLogin = $("btn-login"), btnCopy = $("btn-copy"), tokenBox = $("tokenBox");
 
     /* ===== PKCE helpers ===== */
-    const rand = (len=64) => {
-      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-      const bytes = crypto.getRandomValues(new Uint8Array(len));
-      return Array.from(bytes, b => chars[b % chars.length]).join("");
-    };
-    const sha256 = async (str) => {
-      const data = new TextEncoder().encode(str);
-      return await crypto.subtle.digest("SHA-256", data);
-    };
-    const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
-      .replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+    const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
+    const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
 
-    /* ===== UX helpers ===== */
-    function go(screen) {
-      if (screen === "A") { screenA.classList.remove("hide"); screenB.classList.add("hide"); }
-      else { screenA.classList.add("hide"); screenB.classList.remove("hide"); }
+    /* ===== UI helpers ===== */
+    function go(which){ if(which==="A"){screenA.classList.remove("hide");screenB.classList.add("hide")} else {screenA.classList.add("hide");screenB.classList.remove("hide")} }
+    function setToken(t){
+      tokenBox.value = t;
+      // select-all on click or focus (for manual copy)
+      tokenBox.addEventListener("focus", ()=>tokenBox.select(), { once:true });
+      tokenBox.addEventListener("click", ()=>tokenBox.select());
     }
-    function setToken(rt) {
-      tokenBox.value = rt;
-      // clicking anywhere in the field selects all
-      tokenBox.addEventListener("focus", () => tokenBox.select());
-      tokenBox.addEventListener("click", () => tokenBox.select());
-    }
-
-    async function robustCopy(text) {
-      // 1) Try modern async API
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch (_) {
-        // 2) Fallback: temporary input + execCommand
-        const temp = document.createElement("textarea");
-        temp.value = text;
-        temp.style.position = "fixed";
-        temp.style.opacity = "0";
-        document.body.appendChild(temp);
-        temp.focus();
-        temp.select();
-        try {
-          const ok = document.execCommand("copy");
-          document.body.removeChild(temp);
-          if (ok) return true;
-        } catch {}
-        document.body.removeChild(temp);
+    async function robustCopy(text){
+      try { await navigator.clipboard.writeText(text); return true; }
+      catch {
+        // fallback for strict browsers
+        const ta=document.createElement("textarea");
+        ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        let ok=false; try { ok=document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta); return ok;
       }
-      return false;
     }
-
-    async function autoCopyWithGestureFallback(text) {
-      // attempt immediately
-      if (await robustCopy(text)) {
-        statusB.textContent = "Copied!";
-        return;
-      }
-      // some browsers require a user gesture—hook the first one
-      statusB.textContent = "Tap the page or press any key to copy…";
+    async function autoCopyWithGestureFallback(text){
+      if (await robustCopy(text)) { statusB.textContent="Copied!"; statusB.classList.remove("err"); statusB.classList.add("ok"); return; }
+      statusB.textContent="Tap anywhere or press a key to copy…";
       const once = async () => {
         window.removeEventListener("pointerdown", once);
         window.removeEventListener("keydown", once);
         const ok = await robustCopy(text);
-        statusB.textContent = ok ? "Copied!" : "Copy failed. Use the Manual Copy button.";
+        statusB.textContent = ok ? "Copied!" : "Copy failed. Use Manual Copy.";
+        statusB.classList.toggle("ok", ok);
+        statusB.classList.toggle("err", !ok);
       };
       window.addEventListener("pointerdown", once, { once:true });
       window.addEventListener("keydown", once, { once:true });
     }
 
-    /* ===== Flow: Sign-in ===== */
-    btnLogin?.addEventListener("click", async () => {
-      if (!CLIENT_ID) { alert("Missing CLIENT_ID"); return; }
-      const verifier = rand(64);
-      const challenge = b64url(await sha256(verifier));
+    /* ===== Sign-in ===== */
+    btnLogin?.addEventListener("click", async ()=>{
+      if (!CLIENT_ID || CLIENT_ID.includes("__CLIENT_ID__")) { alert("CLIENT_ID not set."); return; }
+      const verifier = rand(64); const challenge = b64url(await sha256(verifier));
       sessionStorage.setItem("pkce_verifier", verifier);
-      const state = rand(12);
-      sessionStorage.setItem("state", state);
-
-      const params = new URLSearchParams({
-        response_type: "code",
-        client_id: CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        scope: SCOPES,
-        code_challenge_method: "S256",
-        code_challenge: challenge,
-        state
-      });
-      location.href = "https://accounts.spotify.com/authorize?" + params.toString();
+      const state = rand(12); sessionStorage.setItem("state", state);
+      const q = new URLSearchParams({ response_type:"code", client_id:CLIENT_ID, redirect_uri:REDIRECT_URI, scope:SCOPES, code_challenge_method:"S256", code_challenge:challenge, state });
+      location.href = "https://accounts.spotify.com/authorize?" + q.toString();
     });
 
     /* ===== Handle redirect ===== */
-    (async function handleReturn() {
+    (async function handleReturn(){
       const qs = new URLSearchParams(location.search);
-      if (qs.get("error")) {
-        statusA.textContent = "Authorization cancelled.";
-        history.replaceState({}, "", REDIRECT_URI);
-        return;
-      }
-      const code = qs.get("code");
-      const state = qs.get("state");
-      if (!code) return;
-
-      const stored = sessionStorage.getItem("state");
-      sessionStorage.removeItem("state");
-      if (!state || state !== stored) {
-        statusA.textContent = "State mismatch. Try again.";
-        history.replaceState({}, "", REDIRECT_URI);
-        return;
-      }
+      if (qs.get("error")) { statusA.textContent="Authorization cancelled."; history.replaceState({}, "", REDIRECT_URI); return; }
+      const code = qs.get("code"), state = qs.get("state"); if (!code) return;
+      const stored = sessionStorage.getItem("state"); sessionStorage.removeItem("state");
+      if (!state || state !== stored) { statusA.textContent="State mismatch. Try again."; history.replaceState({}, "", REDIRECT_URI); return; }
 
       try {
-        const verifier = sessionStorage.getItem("pkce_verifier") || "";
-        sessionStorage.removeItem("pkce_verifier");
-        const body = new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: REDIRECT_URI,
-          client_id: CLIENT_ID,
-          code_verifier: verifier
-        });
-        const res = await fetch("https://accounts.spotify.com/api/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body
-        });
-        const tok = await res.json();
-        if (!res.ok) throw new Error(JSON.stringify(tok));
+        const verifier = sessionStorage.getItem("pkce_verifier") || ""; sessionStorage.removeItem("pkce_verifier");
+        const body = new URLSearchParams({ grant_type:"authorization_code", code, redirect_uri:REDIRECT_URI, client_id:CLIENT_ID, code_verifier:verifier });
+        const r = await fetch("https://accounts.spotify.com/api/token", { method:"POST", headers:{ "Content-Type":"application/x-www-form-urlencoded" }, body });
+        const tok = await r.json(); if (!r.ok) throw new Error(JSON.stringify(tok));
+        const rt = tok.refresh_token || ""; if (!rt) throw new Error("No refresh_token returned.");
 
-        const refreshToken = tok.refresh_token || "";
-        if (!refreshToken) throw new Error("No refresh_token returned.");
-
-        // Show token screen
-        setToken(refreshToken);
-        go("B");
-
-        // Try to copy automatically; if blocked, retry on first gesture
-        await autoCopyWithGestureFallback(refreshToken);
-
+        setToken(rt); go("B");
+        await autoCopyWithGestureFallback(rt);
       } catch (e) {
-        statusA.textContent = "Token exchange failed. Please try again.";
-        console.error(e);
+        statusA.textContent="Token exchange failed. Please try again."; console.error(e);
       } finally {
-        // Clean query string
-        history.replaceState({}, "", REDIRECT_URI);
+        history.replaceState({}, "", REDIRECT_URI); // clean query
       }
     })();
 
     /* ===== Manual Copy ===== */
-    btnCopy?.addEventListener("click", async () => {
+    btnCopy?.addEventListener("click", async ()=>{
       const ok = await robustCopy(tokenBox.value);
       statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
+      statusB.classList.toggle("ok", ok);
+      statusB.classList.toggle("err", !ok);
     });
   </script>
 </body>
