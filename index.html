@@ -165,8 +165,7 @@ window.addEventListener('DOMContentLoaded', () => {
       c.style.width = w+'px'; c.style.height = h+'px';
       c.width = (w*dpr)|0; c.height = (h*dpr)|0;
       ctx.setTransform(dpr,0,0,dpr,0,0);
-      // rebuild drops
-      const count = Math.floor((w*h)/38000); // scale with screen
+      const count = Math.floor((w*h)/38000);
       drops = new Array(count).fill(0).map(()=>spawn());
     }
     function spawn(){
@@ -178,7 +177,6 @@ window.addEventListener('DOMContentLoaded', () => {
       };
     }
     function drawGlass(){
-      // soft frosted plate in center
       const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
       g.addColorStop(0, '#0f141f');
       g.addColorStop(1, '#0b0b0c');
@@ -217,14 +215,137 @@ window.addEventListener('DOMContentLoaded', () => {
     })();
   })();
 
-  /* ================= Typing (suffix only, anchored, smooth, loop) ================= */
+  /* ================= Sound engine (Holy Pandas) ================= */
+  const muteBtn = document.getElementById('mute');
+  class SoundEngine {
+    constructor(){
+      this.ctx = null;
+      this.gain = null;
+      this.ready = false;
+      this.muted = true; // default off until user clicks
+      this.base = 'resources/sounds/holy-pandas';
+
+      // Adjust here if your filenames differ:
+      this.PRESS_FILES = {
+        space: 'space.mp3',
+        backspace: 'backspace.mp3',
+        generic: ['generic0.mp3','generic1.mp3','generic2.mp3','generic3.mp3','generic4.mp3']
+      };
+      this.RELEASE_FILES = {
+        space: 'release/space.mp3',
+        backspace: 'release/backspace.mp3',
+        generic: 'release/generic.mp3'
+      };
+
+      this.buffers = { press:{}, release:{} };
+      // Per-key random assignment for generics so each letter has a consistent “switch”
+      this.genericIndexByKey = {};
+    }
+    async init(){
+      if (this.ctx) return;
+      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      this.gain = this.ctx.createGain();
+      this.gain.gain.value = 0.9;
+      this.gain.connect(this.ctx.destination);
+      await this.preload();
+      this.ready = true;
+    }
+    async loadBuffer(path){
+      const r = await fetch(`${this.base}/${path}`);
+      const a = await r.arrayBuffer();
+      return await this.ctx.decodeAudioData(a);
+    }
+    async preload(){
+      // Press: space, backspace
+      this.buffers.press.space = await this.loadBuffer(this.PRESS_FILES.space);
+      this.buffers.press.backspace = await this.loadBuffer(this.PRESS_FILES.backspace);
+      // Press generics 0..4
+      this.buffers.press.generic = await Promise.all(
+        this.PRESS_FILES.generic.map(p => this.loadBuffer(p))
+      );
+      // Release
+      this.buffers.release.space = await this.loadBuffer(this.RELEASE_FILES.space);
+      this.buffers.release.backspace = await this.loadBuffer(this.RELEASE_FILES.backspace);
+      this.buffers.release.generic = await this.loadBuffer(this.RELEASE_FILES.generic);
+    }
+    setMuted(flag){
+      this.muted = flag;
+      muteBtn.textContent = 'Typing sound: ' + (flag ? 'off' : 'on');
+      muteBtn.setAttribute('aria-pressed', String(!flag));
+    }
+    playBuffer(buf){
+      if (!this.ready || this.muted) return;
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(this.gain);
+      src.start();
+    }
+    keyToGroup(key, isRelease){
+      // Normalize a KeyboardEvent.key or a single character from the animator
+      if (key === ' ' || key === 'Spacebar' || key === 'Space') return 'space';
+      if (key === 'Backspace') return 'backspace';
+      // We’re not using enter for now, per your note.
+      return 'generic';
+    }
+    genericIndexForKey(key){
+      // Assign each physical key a stable generic index 0..N for this session
+      if (!(key in this.genericIndexByKey)){
+        const n = this.buffers.press.generic.length;
+        this.genericIndexByKey[key] = Math.floor(Math.random()*n);
+      }
+      return this.genericIndexByKey[key];
+    }
+    press(key){
+      const group = this.keyToGroup(key, false);
+      if (group === 'generic'){
+        const idx = this.genericIndexForKey(key);
+        this.playBuffer(this.buffers.press.generic[idx]);
+      } else {
+        this.playBuffer(this.buffers.press[group]);
+      }
+    }
+    release(key){
+      const group = this.keyToGroup(key, true);
+      // release has a single generic file
+      this.playBuffer(this.buffers.release[group] || this.buffers.release.generic);
+    }
+  }
+
+  const sound = new SoundEngine();
+  const ensureAudio = async () => { await sound.init(); };
+
+  // Mute toggle: first click also resumes/initializes the AudioContext (user gesture)
+  const setMuted = m => sound.setMuted(m);
+  setMuted(true);
+  muteBtn.addEventListener('click', async ()=>{
+    await ensureAudio();
+    setMuted(!sound.muted);
+  });
+
+  // Real keyboard: play press/release
+  window.addEventListener('keydown', async (e)=>{
+    if (sound.muted) return;
+    if (!sound.ctx) await ensureAudio();
+    // Avoid auto-repeat storms feeling odd; still allow if you want repeats:
+    // if (e.repeat) return;
+    sound.press(e.key.length === 1 ? e.key : e.key); // single char or named key
+  }, {passive:true});
+
+  window.addEventListener('keyup', async (e)=>{
+    if (sound.muted) return;
+    if (!sound.ctx) await ensureAudio();
+    sound.release(e.key.length === 1 ? e.key : e.key);
+  }, {passive:true});
+
+  /* ================= Typing (suffix animation) =================
+     Replaces the old synthetic 'tap()' with Holy Pandas sounds.
+     For animated typing we simulate a quick press+release per “virtual key”.
+  */
   (function typing(){
     const suffixLane = document.querySelector('.suffixLane');
     const suffix = document.getElementById('suffix');
     const caret = document.getElementById('caret');
-    const muteBtn = document.getElementById('mute');
 
-    // Measure max width using an offscreen span so center stays steady
     const measure = (text)=>{
       const s = document.createElement('span');
       s.style.visibility='hidden'; s.style.position='absolute'; s.style.whiteSpace='nowrap';
@@ -235,45 +356,32 @@ window.addEventListener('DOMContentLoaded', () => {
       document.body.removeChild(s);
       return w;
     };
-    const MAX_SUFFIX = 'cheat.cc'; // lowercase 'c' per spec
+    const MAX_SUFFIX = 'cheat.cc';
     suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
 
-    // sound (nicer tap)
-    let audioCtx=null, muted=true;
-    const setMuted = m => { muted=m; muteBtn.textContent = 'Typing sound: ' + (muted?'off':'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
-    setMuted(true);
-    muteBtn.addEventListener('click',()=>{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); setMuted(!muted); });
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+    const jiggle = ()=>{ caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120); };
 
-    function tap(){
-      if (muted || !audioCtx) return;
-      const ctx = audioCtx;
-      // short filtered noise burst
-      const noise = ctx.createBufferSource();
-      const buffer = ctx.createBuffer(1, 4410, 44100); // 0.1s
-      const data = buffer.getChannelData(0);
-      for (let i=0;i<data.length;i++){ data[i] = (Math.random()*2-1) * Math.pow(1 - i/data.length, 2); }
-      noise.buffer = buffer;
-
-      const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1600; bp.Q.value=5;
-      const g = ctx.createGain(); g.gain.value = 0.08;
-
-      noise.connect(bp).connect(g).connect(ctx.destination);
-      const t = ctx.currentTime;
-      noise.start(t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.06); noise.stop(t+0.07);
+    async function playCharSounds(ch){
+      if (sound.muted || !sound.ctx) return;
+      const key = ch === '' ? 'Backspace' : ch; // backspace handled elsewhere
+      sound.press(key);
+      setTimeout(()=>sound.release(key), 55);
     }
 
-    const sleep = ms => new Promise(r=>setTimeout(r, ms));
-
-    async function type(text, cps){ // time-based for buttery motion
+    async function type(text, cps){
       const start = performance.now(); let i = 0;
       while (i < text.length){
         const elapsed = (performance.now()-start)/1000;
         const target = Math.floor(elapsed*cps);
         if (target > i){
           i = Math.min(target, text.length);
-          suffix.textContent = text.slice(0,i);
-          caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-          tap();
+          const next = text.slice(0,i);
+          const ch = next[next.length-1];
+          suffix.textContent = next;
+          jiggle();
+          await ensureAudio();
+          await playCharSounds(ch);
         }
         await new Promise(r=>requestAnimationFrame(r));
       }
@@ -281,18 +389,21 @@ window.addEventListener('DOMContentLoaded', () => {
     async function backspace(n, cps){
       for (let i=0;i<n;i++){
         suffix.textContent = suffix.textContent.slice(0,-1);
-        caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-        tap(); await sleep(1000/cps);
+        jiggle();
+        await ensureAudio();
+        sound.press('Backspace');
+        setTimeout(()=>sound.release('Backspace'), 55);
+        await sleep(1000/cps);
       }
     }
 
     async function loop(){
       while(true){
         suffix.textContent = '';
-        await type('cheat.cc', 7);     // slower
+        await type('cheat.cc', 7);
         await sleep(900);
-        await backspace('cheat.cc'.length, 7); // slow erase
-        await type('ify', 4);          // extra slow
+        await backspace('cheat.cc'.length, 7);
+        await type('ify', 4);
         await sleep(1800);
         await backspace('ify'.length, 9);
         await sleep(500);
@@ -326,7 +437,9 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
   async function autoCopyWithGestureFallback(text){
-    if (await robustCopy(text)) { statusB.textContent="Copied!"; statusB.classList.remove("err"); statusB.classList.add("ok"); return; }
+    try {
+      if (await robustCopy(text)) { statusB.textContent="Copied!"; statusB.classList.remove("err"); statusB.classList.add("ok"); return; }
+    } catch {}
     statusB.textContent="Tap anywhere or press a key to copy…";
     const once = async () => {
       window.removeEventListener("pointerdown", once);
@@ -375,5 +488,11 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+
 </body>
 </html>
+
+
+
+
+
