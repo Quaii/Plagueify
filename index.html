@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Plagueify — Refresh Token</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; }
+    html, body { height:100%; margin:0; }
+    body {
+      background:#0b0b0c;
+      color:#e8e8ea;
+      display:grid;
+      place-items:center;
+      font:16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      overflow:hidden;
+    }
+    .wrap { width:min(980px, 92vw); padding:24px; }
+
+    /* HERO */
+    .hero {
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:28px;
+      transform:translateY(8px);
+      opacity:0;
+      animation: heroIn 700ms cubic-bezier(.2,.75,.2,1) forwards;
+      animation-delay: 80ms;
+    }
+    @keyframes heroIn {
+      from { opacity:0; transform:translateY(18px) scale(.985); filter:saturate(.8) }
+      to   { opacity:1; transform:translateY(0) scale(1); filter:saturate(1) }
+    }
+
+    .logoText {
+      font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      font-weight:800;
+      letter-spacing:.2px;
+      font-size: clamp(40px, 10vw, 92px);
+      line-height: .95;
+      user-select:none;
+      display:flex;
+      gap:.08em;
+      align-items:baseline;
+      animation: breathe 4s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: translateY(0); }
+      50%      { transform: translateY(-2px); }
+    }
+    .brandBlue {
+      background: linear-gradient(180deg, #6da5ff 0%, #4681ff 50%, #3a6df5 100%);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color: transparent;
+      text-shadow: 0 0 0 rgba(0,0,0,0);
+    }
+    .brandWhite { color:#ffffff; }
+
+    /* BUTTON */
+    .btn {
+      appearance:none;
+      border:1px solid #27272b;
+      background:#141417;
+      color:#e8e8ea;
+      border-radius:14px;
+      padding:14px 22px;
+      font-weight:700;
+      letter-spacing:.2px;
+      cursor:pointer;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.04),
+        0 8px 30px rgba(0,0,0,.45);
+      transition: transform .12s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+      will-change: transform;
+      position:relative;
+      overflow:hidden;
+    }
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color:#2f2f36;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.06),
+        0 12px 36px rgba(0,0,0,.55);
+    }
+    .btn:active { transform: translateY(0); }
+    .btn::after{
+      content:"";
+      position:absolute; inset:0 -120% 0 auto;
+      width:120%;
+      transform:skewX(-18deg) translateX(-120%);
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.06) 45%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.06) 55%, transparent 100%);
+      transition: transform .7s ease;
+      pointer-events:none;
+    }
+    .btn:hover::after { transform:skewX(-18deg) translateX(0%); }
+
+    .muted { opacity:.72; font-size:.95rem; }
+
+    /* TOKEN PANEL */
+    .panel {
+      width:min(780px, 92vw);
+      margin-top:22px;
+      padding:18px;
+      border-radius:14px;
+      border:1px solid #222229;
+      background:#121216;
+      display:none;
+      animation: panelIn 400ms ease forwards;
+    }
+    @keyframes panelIn { from { opacity:0; transform: translateY(10px) } to { opacity:1; transform: translateY(0) } }
+    textarea {
+      width:100%;
+      min-height:110px;
+      padding:10px 12px;
+      background:#0f1014;
+      color:#e8e8ea;
+      border:1px solid #26262d;
+      border-radius:10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size:.95rem;
+    }
+    .row { margin:12px 0; text-align:center; }
+    .ok { color:#9ae6a0; }
+    .err { color:#ff8c8c; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="logoText">
+        <span class="brandBlue">Plague</span><span class="brandWhite">ify</span>
+      </div>
+      <button class="btn" id="btn-login">Sign in to Spotify</button>
+      <div id="status" class="muted"></div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="row muted">Refresh token (already copied to clipboard):</div>
+      <textarea id="refresh" readonly></textarea>
+      <div class="row">
+        <button class="btn" id="btn-copy">Copy again</button>
+      </div>
+      <div id="copied" class="row muted"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ===== CONFIG ===== */
+    const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3"; // your app’s client ID
+    const REDIRECT_URI = location.origin + location.pathname; // add this EXACT URL in Spotify app
+    const SCOPES = ""; // none required just to mint a refresh token
+
+    /* ===== ELEMENTS ===== */
+    const $ = id => document.getElementById(id);
+    const btnLogin = $("btn-login");
+    const statusEl = $("status");
+    const panel = $("panel");
+    const refreshBox = $("refresh");
+    const btnCopy = $("btn-copy");
+    const copied = $("copied");
+
+    /* ===== PKCE HELPERS ===== */
+    const rand = (len=64) => {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      const bytes = crypto.getRandomValues(new Uint8Array(len));
+      return Array.from(bytes, b => chars[b % chars.length]).join("");
+    };
+    const sha256 = async (str) => {
+      const data = new TextEncoder().encode(str);
+      return await crypto.subtle.digest("SHA-256", data);
+    };
+    const b64url = (buf) =>
+      btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+
+    /* ===== UI HELPERS ===== */
+    function showPanel(token) {
+      refreshBox.value = token || "";
+      panel.style.display = "block";
+      panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    async function copyNow() {
+      try {
+        await navigator.clipboard.writeText(refreshBox.value);
+        copied.textContent = "Copied!";
+        copied.className = "row ok";
+        setTimeout(()=>{ copied.textContent=""; copied.className="row muted"; }, 1500);
+      } catch {
+        copied.textContent = "Copy failed. Select text and copy manually.";
+        copied.className = "row err";
+      }
+    }
+
+    /* ===== FLOW ===== */
+    btnLogin?.addEventListener("click", async () => {
+      if (!CLIENT_ID) {
+        alert("Missing CLIENT_ID.");
+        return;
+      }
+      const verifier = rand(64);
+      const challenge = b64url(await sha256(verifier));
+      sessionStorage.setItem("pkce_verifier", verifier);
+
+      const params = new URLSearchParams({
+        response_type: "code",
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        scope: SCOPES,
+        code_challenge_method: "S256",
+        code_challenge: challenge,
+        state: rand(12)
+      });
+      sessionStorage.setItem("state", params.get("state"));
+      location.href = "https://accounts.spotify.com/authorize?" + params.toString();
+    });
+
+    (async function handleReturn() {
+      const qs = new URLSearchParams(location.search);
+      if (qs.get("error")) {
+        statusEl.textContent = "Authorization cancelled.";
+        history.replaceState({}, "", REDIRECT_URI);
+        return;
+      }
+      const code = qs.get("code");
+      const state = qs.get("state");
+      if (!code) return;
+
+      const stateStored = sessionStorage.getItem("state");
+      sessionStorage.removeItem("state");
+      if (!state || state !== stateStored) {
+        statusEl.textContent = "State mismatch. Please try again.";
+        history.replaceState({}, "", REDIRECT_URI);
+        return;
+      }
+
+      try {
+        const verifier = sessionStorage.getItem("pkce_verifier") || "";
+        sessionStorage.removeItem("pkce_verifier");
+
+        const body = new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: REDIRECT_URI,
+          client_id: CLIENT_ID,
+          code_verifier: verifier
+        });
+
+        const res = await fetch("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body
+        });
+        const tok = await res.json();
+        if (!res.ok) throw new Error(JSON.stringify(tok));
+
+        const refreshToken = tok.refresh_token || "";
+        if (!refreshToken) throw new Error("No refresh_token returned.");
+
+        showPanel(refreshToken);
+        await copyNow();
+      } catch (e) {
+        statusEl.textContent = "Token exchange failed. Please try again.";
+        console.error(e);
+      } finally {
+        history.replaceState({}, "", REDIRECT_URI); // clean ?code=…
+      }
+    })();
+
+    btnCopy?.addEventListener("click", copyNow);
+  </script>
+</body>
+</html>
