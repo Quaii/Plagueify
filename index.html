@@ -279,11 +279,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // sound (sample-based using holy-pandas set)
     let audioCtx = null, masterGain = null, muted = true;
+    const audioEls = new Map(); // HTMLAudio fallback per key
     const setMuted = m => { muted = m; muteBtn.textContent = 'Typing sound: ' + (muted ? 'off' : 'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
     setMuted(false);
 
     // Volume state (0..1), persisted
-    let volume01 = Math.min(1, Math.max(0, Number(localStorage.getItem('volume01') || 0.8)));
+    let volume01 = Math.min(1, Math.max(0, Number(localStorage.getItem('volume01') || 1)));
     function applyVolumeUI(){
       const percent = Math.round(volume01*100);
       volFill.style.height = percent + '%';
@@ -314,7 +315,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         masterGain = audioCtx.createGain();
-        masterGain.gain.value = 0.8; // default 80%
+        masterGain.gain.value = volume01; // align with UI
         masterGain.connect(audioCtx.destination);
       }
       // Try to resume (required on some browsers even after a gesture)
@@ -329,24 +330,38 @@ window.addEventListener('DOMContentLoaded', () => {
             const buf = await audioCtx.decodeAudioData(arr);
             buffers.set(key, buf);
           } catch (e) {
-            console.warn('Audio load failed for', key, 'at', url, e);
+            console.warn('Audio decode failed for', key, 'at', url, e);
+            // Prepare HTMLAudio fallback
+            try{
+              const a = new Audio(url);
+              a.preload = 'auto';
+              audioEls.set(key, a);
+            }catch{}
           }
         })).then(() => { buffersLoaded = true; });
       }
       await buffersLoadingPromise;
     }
 
-    function playBuffer(name, volume = 0.6){
+    function playBuffer(name, volume = 0.9){
       if (muted || !audioCtx) return;
       const buf = buffers.get(name);
-      if (!buf) return;
-      const src = audioCtx.createBufferSource();
-      src.buffer = buf;
-      const g = audioCtx.createGain();
-      g.gain.value = volume;
-      src.connect(g).connect(masterGain);
-      if (audioCtx.state !== 'running') { try { audioCtx.resume(); } catch {} }
-      try { src.start(); } catch {}
+      if (buf){
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const g = audioCtx.createGain();
+        g.gain.value = volume;
+        src.connect(g).connect(masterGain);
+        if (audioCtx.state !== 'running') { try { audioCtx.resume(); } catch {} }
+        try { src.start(); } catch {}
+      } else {
+        // Fallback via HTMLAudio; clone for overlap
+        const el = audioEls.get(name) || audioEls.get('release/GENERIC');
+        if (!el) return;
+        const clone = el.cloneNode(true);
+        clone.volume = Math.max(0, Math.min(1, volume01 * volume));
+        clone.play().catch(()=>{});
+      }
     }
 
     function scheduleRelease(name){
@@ -370,13 +385,22 @@ window.addEventListener('DOMContentLoaded', () => {
       scheduleRelease('release/BACKSPACE');
     }
 
+    function testPing(){
+      // quick audible confirmation: generic press + release
+      const idx = (Math.random()*5)|0;
+      playBuffer('GENERIC_R'+idx, 1.0);
+      scheduleRelease('release/GENERIC');
+    }
+
     muteBtn.addEventListener('click', async () => {
       await ensureAudio();
-      setMuted(!muted);
+      const nowMuted = !muted;
+      setMuted(nowMuted);
+      if (!nowMuted) { testPing(); }
     });
 
     // Warm up audio on first user interaction (without changing mute state)
-    const warmup = async () => { await ensureAudio(); };
+    const warmup = async () => { await ensureAudio(); testPing(); };
     window.addEventListener('pointerdown', warmup, { once: true, passive: true });
     window.addEventListener('pointermove', warmup, { once: true, passive: true });
     window.addEventListener('keydown', warmup, { once: true });
@@ -390,7 +414,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (masterGain) masterGain.gain.value = volume01;
       applyVolumeUI();
     }
-    function startVolDrag(e){ e.preventDefault(); ensureAudio(); dragging=true; const p=e.touches?e.touches[0]:e; setVolumeFromClientY(p.clientY); }
+    function startVolDrag(e){ e.preventDefault(); ensureAudio().then(()=>testPing()); dragging=true; const p=e.touches?e.touches[0]:e; setVolumeFromClientY(p.clientY); }
     function moveVolDrag(e){ if(!dragging) return; const p=e.touches?e.touches[0]:e; setVolumeFromClientY(p.clientY); }
     function endVolDrag(){ dragging=false; }
     let dragging=false;
