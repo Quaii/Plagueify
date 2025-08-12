@@ -13,7 +13,7 @@
   html,body{height:100%;margin:0}
   body{background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden;cursor:none}
 
-  /* Background (constellation); can't intercept clicks */
+  /* BG never blocks clicks */
   #bg{position:fixed;inset:0;z-index:0;width:100%;height:100%;display:block;pointer-events:none;
       background: radial-gradient(900px 600px at 50% 45%, #0e1322 0%, #0c0e14 40%, var(--bg) 70%);}
 
@@ -25,9 +25,13 @@
   .title{font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:800;letter-spacing:.2px;
          font-size:clamp(44px,10vw,96px);line-height:.95;user-select:none;text-align:center;margin:0 0 36px 0;white-space:nowrap;
          text-shadow:0 10px 26px rgba(61,118,255,.18)}
-  .blueGrad{background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
-            filter:drop-shadow(0 0 10px rgba(90,140,255,.16))}
+  .blueGrad{background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
+            -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 10px rgba(90,140,255,.16))}
   .typed{color:#fff}
+  .caret{display:inline-block;width:0.06em;background:#fff;margin-left:2px;transform:translateY(0)}
+  @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.15}}
+  .blink{animation:blink 900ms step-end infinite}
+  @keyframes jiggle{0%{transform:translateY(0)}50%{transform:translateY(-1px)}100%{transform:translateY(0)}}
 
   .block{width:min(680px,86vw);margin:0 auto}
   .label{font-weight:700;margin:0 0 8px 6px;text-shadow:0 2px 10px rgba(0,0,0,.35)}
@@ -35,49 +39,51 @@
          font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
          outline:none;backdrop-filter:blur(2px);transition:border-color .18s ease,transform .18s ease}
   .token:focus{border-color:#3c68ff;transform:translateY(-1px)}
-
   .controls{text-align:center;margin-top:16px}
   .btn{appearance:none;border:1px solid var(--line);background:#1a1c21;color:var(--ink);padding:12px 18px;border-radius:0;font-weight:700;letter-spacing:.2px;cursor:pointer;
        transition:transform .12s ease,border-color .2s ease,box-shadow .2s ease,background .2s ease;box-shadow:0 12px 28px rgba(0,0,0,.28)}
   .btn:hover{transform:translateY(-1px);border-color:#3a4050;background:#1f2228;box-shadow:0 16px 34px rgba(0,0,0,.36)}
   .hero{display:flex;flex-direction:column;align-items:center;gap:28px}
   .btn-cta{padding:14px 22px}
-
   .hide{display:none!important}
   .muted{opacity:.72;font-size:.95rem;text-align:center;margin-top:10px}
   .ok{color:#9ae6a0}.err{color:#ff8c8c}
 
-  /* Custom cursor — centered by CSS first (even if JS fails) */
-  .cursor,.cursor-ring{position:fixed;top:50%;left:50%;pointer-events:none;transform:translate(-50%,-50%);z-index:3}
-  .cursor{width:14px;height:14px;border-radius:50%;
+  /* Custom cursor (no transform math errors) */
+  .cursor{position:fixed;left:50%;top:50%;width:14px;height:14px;border-radius:50%;pointer-events:none;z-index:3;
           background:radial-gradient(circle at 40% 40%,#a8c4ff 0%,#5a8bff 55%,#2a4fff 100%);
-          filter:drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 20px rgba(70,120,255,.35));mix-blend-mode:screen}
-  .cursor-ring{z-index:2;width:34px;height:34px;border:1px solid rgba(110,165,255,.5);border-radius:50%;filter:drop-shadow(0 0 10px rgba(110,165,255,.35))}
+          filter:drop-shadow(0 0 12px rgba(70,120,255,.75)) drop-shadow(0 0 20px rgba(70,120,255,.35));mix-blend-mode:screen;transform:translate(-50%,-50%)}
+  .cursor-ring{position:fixed;left:50%;top:50%;width:34px;height:34px;border:1px solid rgba(110,165,255,.5);border-radius:50%;
+               pointer-events:none;z-index:2;filter:drop-shadow(0 0 10px rgba(110,165,255,.35));transform:translate(-50%,-50%)}
 
   .mute{position:fixed;right:14px;bottom:14px;z-index:4;background:#121317e6;color:#cfd7ff;border:1px solid #2b2f36;
         padding:8px 10px;font-size:.85rem;letter-spacing:.2px;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35)}
   .mute:hover{background:#161922}
-
-  /* tiny inline error badge if something throws */
-  #err{position:fixed;left:12px;bottom:12px;z-index:5;background:#2a1212;color:#ffdcdc;border:1px solid #532222;padding:8px 10px;font-size:.85rem}
 </style>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
+
+<!-- Custom cursor -->
 <div class="cursor" id="cursor"></div>
 <div class="cursor-ring" id="ring"></div>
+
+<!-- Mute typing sound -->
 <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default muted)">🔇 sound off</button>
 
 <div class="stage">
   <div class="container" id="container">
+    <!-- Screen A -->
     <section id="screenA" class="hero">
       <h1 class="title" aria-live="polite">
-        <span id="titleStatic" class="blueGrad">Plague</span><span id="titleTyped" class="typed">ify</span>
+        <span id="titleStatic" class="blueGrad">Plague</span>
+        <span id="titleTyped" class="typed">ify</span><span id="caret" class="caret blink">&nbsp;</span>
       </h1>
       <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
       <div id="statusA" class="muted"></div>
     </section>
 
+    <!-- Screen B -->
     <section id="screenB" class="hide">
       <h1 class="title"><span class="blueGrad">Plague</span><span class="typed">ify</span></h1>
       <div class="block">
@@ -92,152 +98,123 @@
 
 <script>
 window.addEventListener('DOMContentLoaded', () => {
-  /* show container once DOM is ready */
+  /* show */
   document.getElementById('container').classList.add('in');
 
-  /* ========== tiny error reporter ========== */
-  const showErr = (e) => {
-    const div = document.createElement('div');
-    div.id = 'err';
-    div.textContent = 'JS error: ' + (e.message || e);
-    document.body.appendChild(div);
-    console.error(e);
-  };
-  window.addEventListener('error', ev => showErr(ev.error || ev.message));
-  window.addEventListener('unhandledrejection', ev => showErr(ev.reason || ev));
-
-  /* ========== CONFIG ========== */
+  /* ====== config ====== */
   const CLIENT_ID = "ec6dea15d2df46efbb5cc43de67768b3";
-  const REDIRECT_URI = "https://quaii.github.io/Plagueify/"; // must match Spotify app
+  const REDIRECT_URI = "https://quaii.github.io/Plagueify/";
   const SCOPES = "";
 
-  /* ========== ELEMENTS ========== */
+  /* ====== elements ====== */
   const $ = id => document.getElementById(id);
-  const screenA = $("screenA"), screenB = $("screenB");
-  const statusA = $("statusA"), statusB = $("statusB");
-  const btnLogin = $("btn-login"), btnCopy = $("btn-copy"), tokenBox = $("tokenBox");
-  const titleStatic = $("titleStatic"), titleTyped = $("titleTyped");
-  const cursor = $("cursor"), ring = $("ring"), muteBtn = $("mute");
+  const screenA=$("screenA"), screenB=$("screenB");
+  const statusA=$("statusA"), statusB=$("statusB");
+  const btnLogin=$("btn-login"), btnCopy=$("btn-copy"), tokenBox=$("tokenBox");
+  const titleStatic=$("titleStatic"), titleTyped=$("titleTyped"), caret=$("caret");
+  const cursor=$("cursor"), ring=$("ring"), muteBtn=$("mute");
 
-  /* ========== BACKGROUND: CONSTELLATION ========== */
-  (function constellation(){
-    const c = document.getElementById("bg");
-    const ctx = c.getContext("2d");
-    let w, h, dpr;
-
-    function resize(){
-      w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
-      c.style.width = w+"px"; c.style.height = h+"px";
-      c.width = Math.floor(w*dpr); c.height = Math.floor(h*dpr);
-      ctx.setTransform(dpr,0,0,dpr,0,0);
-    }
-    resize(); addEventListener("resize", resize);
-
-    const N = 90;
-    const pts = Array.from({length:N}, ()=>({
-      x: Math.random()*w, y: Math.random()*h,
-      vx: (Math.random()-.5)*.55, vy:(Math.random()-.5)*.55
-    }));
-
-    function step(){
+  /* ====== BG: constellation ====== */
+  (function bg(){
+    const c=document.getElementById('bg'), ctx=c.getContext('2d');
+    let w,h,dpr;
+    function resize(){ w=innerWidth; h=innerHeight; dpr=Math.min(2,devicePixelRatio||1);
+      c.style.width=w+'px'; c.style.height=h+'px'; c.width=w*dpr|0; c.height=h*dpr|0; ctx.setTransform(dpr,0,0,dpr,0,0); }
+    resize(); addEventListener('resize',resize);
+    const N=90, pts=Array.from({length:N},()=>({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.55,vy:(Math.random()-.5)*.55}));
+    (function step(){
       ctx.clearRect(0,0,w,h);
-      for (let i=0;i<N;i++){
-        const a = pts[i];
-        a.x += a.vx; a.y += a.vy;
-        if (a.x<0||a.x>w) a.vx*=-1;
-        if (a.y<0||a.y>h) a.vy*=-1;
-        for (let j=i+1;j<N;j++){
-          const b = pts[j];
-          const dx=a.x-b.x, dy=a.y-b.y, d2=dx*dx+dy*dy;
-          if (d2 < 130*130){
-            const alpha = 1 - (Math.sqrt(d2)/130);
-            ctx.strokeStyle = `rgba(90,140,255,${alpha*.22})`;
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-          }
-        }
+      for(let i=0;i<N;i++){const a=pts[i]; a.x+=a.vx; a.y+=a.vy;
+        if(a.x<0||a.x>w) a.vx*=-1; if(a.y<0||a.y>h) a.vy*=-1;
+        for(let j=i+1;j<N;j++){const b=pts[j],dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy;
+          if(d2<130*130){const al=1-(Math.sqrt(d2)/130); ctx.strokeStyle=`rgba(90,140,255,${al*.22})`; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();}}
       }
-      for (const p of pts){
-        ctx.fillStyle = "rgba(120,160,255,.32)";
-        ctx.beginPath(); ctx.arc(p.x,p.y,1.1,0,Math.PI*2); ctx.fill();
-      }
+      for(const p of pts){ctx.fillStyle="rgba(120,160,255,.32)"; ctx.beginPath(); ctx.arc(p.x,p.y,1.1,0,6.283); ctx.fill();}
       requestAnimationFrame(step);
-    }
-    step();
+    })();
   })();
 
-  /* ========== CUSTOM CURSOR (RAF; always moves) ========== */
+  /* ====== cursor (precise) ====== */
   (function fancyCursor(){
-    let x = innerWidth/2, y = innerHeight/2;
-    let tx = x, ty = y;
-
-    const move = e=>{
-      const t = e.touches ? e.touches[0] : e;
-      tx = t.clientX; ty = t.clientY;
-    };
-    addEventListener("pointermove", move, {passive:true});
-    addEventListener("touchmove", move, {passive:true});
-
+    let x=innerWidth/2,y=innerHeight/2, tx=x, ty=y;
+    const move=e=>{const t=e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY;};
+    addEventListener('pointermove',move,{passive:true}); addEventListener('touchmove',move,{passive:true});
     (function tick(){
-      x += (tx - x) * 0.2;
-      y += (ty - y) * 0.2;
-      const t = `translate(${x}px, ${y}px) translate(-50%,-50%)`;
-      cursor.style.transform = t;
-      ring.style.transform = t;
+      // dot snaps to true pointer for accuracy; ring eases for nice trail
+      x=tx; y=ty;
+      cursor.style.left=x+'px'; cursor.style.top=y+'px';
+      const rx=parseFloat(ring.style.left)||innerWidth/2, ry=parseFloat(ring.style.top)||innerHeight/2;
+      const nx=rx+(x-rx)*0.18, ny=ry+(y-ry)*0.18;
+      ring.style.left=nx+'px'; ring.style.top=ny+'px';
       requestAnimationFrame(tick);
     })();
   })();
 
-  /* ========== TYPING (no external libs; always starts) ========== */
+  /* ====== typing sequence (buttery, centered, looped) ====== */
   (function typing(){
-    let audioCtx = null, muted = true;
-    const setMuted = m => { muted = m; muteBtn.textContent = muted ? "🔇 sound off" : "🔊 sound on"; muteBtn.setAttribute("aria-pressed", String(!muted)); };
+    let audioCtx=null, muted=true;
+    const setMuted=m=>{muted=m; muteBtn.textContent=muted?"🔇 sound off":"🔊 sound on"; muteBtn.setAttribute("aria-pressed", String(!muted));};
     setMuted(true);
-    muteBtn.addEventListener("click", () => { if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); setMuted(!muted); });
+    muteBtn.addEventListener("click",()=>{ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); setMuted(!muted); });
 
     const clickTick = ()=>{
-      if (muted || !audioCtx) return;
-      const ctx = audioCtx;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "square"; o.frequency.value = 220 + Math.random()*40;
-      g.gain.value = 0.08;
-      o.connect(g).connect(ctx.destination);
-      const now = ctx.currentTime; o.start(now);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-      o.stop(now + 0.07);
+      if(muted||!audioCtx) return;
+      const ctx=audioCtx, o=ctx.createOscillator(), g=ctx.createGain();
+      o.type="square"; o.frequency.value=220+Math.random()*40; g.gain.value=0.07;
+      o.connect(g).connect(ctx.destination); const t=ctx.currentTime; o.start(t); g.gain.exponentialRampToValueAtTime(0.0001, t+0.06); o.stop(t+0.07);
     };
 
-    const type = async (text, speed=55) => {
-      titleTyped.textContent = "";
-      for (let i=0;i<text.length;i++){
-        titleTyped.textContent = text.slice(0, i+1);
-        clickTick();
-        await new Promise(r=>setTimeout(r, speed));
+    const phase1 = "plaguecheat.cc";    // lower-case for the gag
+    const erase1 = "cheat.cc";          // part to remove
+    const phase2 = "ify";
+
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+
+    async function typeText(text, cps=16){ // characters per second (time-based)
+      const start=performance.now(); let i=0;
+      while(i<text.length){
+        const t=performance.now(); const elapsed=(t-start)/1000; const target=Math.floor(elapsed*cps);
+        if(target>i){ i=Math.min(target, text.length); titleTyped.textContent=text.slice(0,i); caret.classList.add('blink'); caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120); clickTick(); }
+        await new Promise(r=>requestAnimationFrame(r));
       }
-    };
-    const backspace = async (speed=38) => {
-      while (titleTyped.textContent.length){
+    }
+    async function backspace(n, cps=18){
+      let count=n;
+      while(count>0){
         titleTyped.textContent = titleTyped.textContent.slice(0,-1);
-        clickTick();
-        await new Promise(r=>setTimeout(r, speed));
+        count--; caret.classList.add('blink'); caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120); clickTick();
+        await sleep(1000/cps);
       }
-    };
+    }
 
-    (async ()=>{
-      titleStatic.style.visibility = "hidden";
-      await type("plaguecheat.cc", 60);
-      await new Promise(r=>setTimeout(r, 600));
-      await backspace(32);
-      titleStatic.style.visibility = "visible";
-      await type("ify", 90);
-    })();
+    async function runLoop(){
+      while(true){
+        // phase: show only typed (hide gradient part)
+        titleStatic.style.visibility="hidden";
+        titleTyped.textContent="";
+        await typeText(phase1, 17); // ~17 cps smooth
+        await sleep(600);
+
+        // delete "cheat.cc"
+        await backspace(erase1.length, 20);
+
+        // show gradient "Plague" again, type "ify"
+        titleStatic.style.visibility="visible";
+        await typeText(phase2, 10);
+        await sleep(1800);
+
+        // reset to prepare next loop
+        await backspace(phase2.length, 22);
+      }
+    }
+    runLoop();
   })();
 
-  /* ========== PKCE helpers ========== */
+  /* ====== PKCE helpers and flow ====== */
   const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
   const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+
   const go = w => (w==="A" ? (screenA.classList.remove("hide"),screenB.classList.add("hide")) : (screenA.classList.add("hide"),screenB.classList.remove("hide")));
   function setToken(t){ tokenBox.value=t; tokenBox.addEventListener("focus",()=>tokenBox.select(),{once:true}); tokenBox.addEventListener("click",()=>tokenBox.select()); }
 
@@ -264,7 +241,6 @@ window.addEventListener('DOMContentLoaded', () => {
     window.addEventListener("keydown", once, {once:true});
   }
 
-  /* ========== SIGN-IN ========== */
   btnLogin.addEventListener("click", async ()=>{
     const verifier = rand(64); const challenge = b64url(await sha256(verifier));
     sessionStorage.setItem("pkce_verifier", verifier);
@@ -273,7 +249,6 @@ window.addEventListener('DOMContentLoaded', () => {
     location.href = "https://accounts.spotify.com/authorize?" + q.toString();
   });
 
-  /* ========== HANDLE REDIRECT ========== */
   (async function handleReturn(){
     const qs = new URLSearchParams(location.search);
     if (qs.get("error")) { statusA.textContent="Authorization cancelled."; history.replaceState({}, "", REDIRECT_URI); return; }
@@ -295,7 +270,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  /* ========== MANUAL COPY ========== */
   btnCopy.addEventListener("click", async ()=>{
     const ok = await robustCopy(tokenBox.value);
     statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
