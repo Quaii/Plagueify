@@ -109,6 +109,19 @@
   }
   .mute:hover{ background:#161922 }
 </style>
+  <!-- Preload key sounds for faster first-play -->
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/BACKSPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/ENTER.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/SPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R0.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R1.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R2.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R3.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R4.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/BACKSPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/ENTER.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/SPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/GENERIC.mp3">
 </head>
 <body>
   <!-- Frosted glass + raindrops -->
@@ -118,7 +131,7 @@
   <div class="cursorRing" id="ring"></div>
 
   <!-- Typing sound toggle -->
-  <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default muted)">Typing sound: off</button>
+  <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default on)">Typing sound: on</button>
 
   <div class="stage">
     <div class="container" id="container">
@@ -241,7 +254,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // sound (sample-based using holy-pandas set)
     let audioCtx = null, muted = true;
     const setMuted = m => { muted = m; muteBtn.textContent = 'Typing sound: ' + (muted ? 'off' : 'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
-    setMuted(true);
+    setMuted(false);
 
     const basePath = 'resources/sounds/holy-pandas/';
     const soundPaths = {
@@ -263,6 +276,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     async function ensureAudio(){
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Try to resume (required on some browsers even after a gesture)
+      try { await audioCtx.resume(); } catch {}
       if (buffersLoaded) return;
       if (!buffersLoadingPromise) {
         const entries = Object.entries(soundPaths);
@@ -273,14 +288,14 @@ window.addEventListener('DOMContentLoaded', () => {
             const buf = await audioCtx.decodeAudioData(arr);
             buffers.set(key, buf);
           } catch (e) {
-            // If a file is missing, skip silently
+            console.warn('Audio load failed for', key, 'at', url, e);
           }
         })).then(() => { buffersLoaded = true; });
       }
       await buffersLoadingPromise;
     }
 
-    function playBuffer(name, volume = 0.8){
+    function playBuffer(name, volume = 0.6){
       if (muted || !audioCtx) return;
       const buf = buffers.get(name);
       if (!buf) return;
@@ -289,7 +304,8 @@ window.addEventListener('DOMContentLoaded', () => {
       const g = audioCtx.createGain();
       g.gain.value = volume;
       src.connect(g).connect(audioCtx.destination);
-      src.start();
+      if (audioCtx.state !== 'running') { try { audioCtx.resume(); } catch {} }
+      try { src.start(); } catch {}
     }
 
     function scheduleRelease(name){
@@ -318,6 +334,12 @@ window.addEventListener('DOMContentLoaded', () => {
       setMuted(!muted);
     });
 
+    // Warm up audio on first user interaction (without changing mute state)
+    const warmup = async () => { await ensureAudio(); };
+    window.addEventListener('pointerdown', warmup, { once: true, passive: true });
+    window.addEventListener('pointermove', warmup, { once: true, passive: true });
+    window.addEventListener('keydown', warmup, { once: true });
+
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
     async function type(text, cps){ // time-based, but play a sound per character
@@ -331,6 +353,8 @@ window.addEventListener('DOMContentLoaded', () => {
           i++;
           suffix.textContent = text.slice(0,i);
           caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          // Fire-and-forget ensure to reduce first-play latency
+          if (!buffersLoaded && !buffersLoadingPromise) { ensureAudio(); }
           playPressForChar(ch);
         }
         await new Promise(r=>requestAnimationFrame(r));
@@ -340,6 +364,7 @@ window.addEventListener('DOMContentLoaded', () => {
       for (let i=0;i<n;i++){
         suffix.textContent = suffix.textContent.slice(0,-1);
         caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+        if (!buffersLoaded && !buffersLoadingPromise) { ensureAudio(); }
         playBackspace();
         await sleep(1000/cps);
       }
