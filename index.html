@@ -174,7 +174,7 @@
   <div class="fxLayer grainLayer" aria-hidden="true"></div>
 
   <!-- Custom glow cursor -->
-  <div class="cursorRing" id="ring"></div>
+  <div class="cursorRing" id="cursor-ring" aria-hidden="true"></div>
 
   <div class="stage">
     <div class="container" id="container">
@@ -302,33 +302,19 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  /* ================= Precise glow cursor (ring only) ================= */
-  (function cursorRing(){
-    const ring = document.getElementById('ring');
-    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* ================= Glow cursor (pure bloom) ================= */
+  (()=>{
+    const ring = document.getElementById('cursor-ring');
+    if (!ring) return;
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced){ ring.style.display='none'; return; }
-    let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
-    let throttleFlip = false;
-    const heavy = (innerWidth*innerHeight*(window.devicePixelRatio||1)) > 5_000_000;
-    function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
-    addEventListener('pointermove', move, {passive:true});
-    function isInteractiveAt(x,y){
-      const el = document.elementFromPoint(x,y);
-      if (!el) return false;
-      const sel = 'button, a, [role="button"], input, textarea, select, .btn';
-      return el.closest(sel) != null;
-    }
-    (function tick(){
-      if (heavy){ throttleFlip = !throttleFlip; if (throttleFlip){ requestAnimationFrame(tick); return; } }
-      rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
-      const overInteractive = isInteractiveAt(tx,ty);
-      ring.style.left = rx+'px'; ring.style.top = ry+'px';
-      ring.style.transform = 'translate(-50%,-50%)';
-      ring.style.boxShadow = overInteractive
-        ? '0 0 24px rgba(90,140,255,.26), 0 0 48px rgba(90,140,255,.20), 0 0 96px rgba(90,140,255,.16), 0 0 160px rgba(90,140,255,.12), 0 0 240px rgba(90,140,255,.10), 0 0 320px rgba(90,140,255,.07), 0 0 480px rgba(90,140,255,.04)'
-        : '0 0 24px rgba(90,140,255,.18), 0 0 48px rgba(90,140,255,.12), 0 0 80px rgba(90,140,255,.085), 0 0 160px rgba(90,140,255,.07), 0 0 240px rgba(90,140,255,.045), 0 0 320px rgba(90,140,255,.032), 0 0 480px rgba(90,140,255,.025)';
-      requestAnimationFrame(tick);
-    })();
+    let tx = innerWidth/2, ty = innerHeight/2, x = tx, y = ty;
+    function onMove(e){ const p = e.touches? e.touches[0]: e; tx = p.clientX; ty = p.clientY; }
+    addEventListener('mousemove', onMove, {passive:true});
+    addEventListener('touchmove', onMove, {passive:true});
+    (function loop(){ x += (tx-x)*0.18; y += (ty-y)*0.18; ring.style.left = x+'px'; ring.style.top = y+'px'; requestAnimationFrame(loop); })();
+    const obs = new MutationObserver(()=> ring.parentNode?.appendChild(ring));
+    obs.observe(document.body, { childList:true });
   })();
 
   /* ================= Typing (suffix only, anchored, smooth, loop) ================= */
