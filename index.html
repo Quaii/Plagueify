@@ -98,8 +98,6 @@
       inset 0 0 22px rgba(90,140,255,.25);
     transform:translate(-50%,-50%);
   }
-
-  /* removed mute/volume styles */
 </style>
 </head>
 <body>
@@ -108,8 +106,6 @@
 
   <!-- Custom glow cursor -->
   <div class="cursorRing" id="ring"></div>
-
-  
 
   <div class="stage">
     <div class="container" id="container">
@@ -228,18 +224,15 @@ window.addEventListener('DOMContentLoaded', () => {
     const MAX_SUFFIX = 'cheat.cc'; // lowercase 'c' per spec
     suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
 
-    // remove typing sounds
-
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    async function type(text, cps){
+    async function type(text, cps){ // time-based
       const start = performance.now(); let i = 0;
       while (i < text.length){
         const elapsed = (performance.now()-start)/1000;
         const target = Math.floor(elapsed*cps);
         const next = Math.min(target, text.length);
         while (i < next){
-          const ch = text[i];
           i++;
           suffix.textContent = text.slice(0,i);
           caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
@@ -280,70 +273,78 @@ window.addEventListener('DOMContentLoaded', () => {
   const statusA = $('statusA'), statusB = $('statusB');
   const btnLogin = $('btn-login'), btnCopy = $('btn-copy'), tokenBox = $('tokenBox');
 
-  const rand = (len=64)=>{const c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";const b=crypto.getRandomValues(new Uint8Array(len));return Array.from(b,x=>c[x%c.length]).join("")};
-  const sha256 = async s => crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_");
+  function randomId(){
+    return Array(32).fill(0).map(()=>Math.random().toString(36)[2]||0).join('');
+  }
 
-  const go = w => (w==="A" ? (screenA.classList.remove("hide"),screenB.classList.add("hide")) : (screenA.classList.add("hide"),screenB.classList.remove("hide")));
-  function setToken(t){ tokenBox.value=t; tokenBox.addEventListener("focus",()=>tokenBox.select(),{once:true}); tokenBox.addEventListener("click",()=>tokenBox.select()); }
-  async function robustCopy(text){
-    try { await navigator.clipboard.writeText(text); return true; }
-    catch {
-      const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
-      document.body.appendChild(ta); ta.focus(); ta.select();
-      let ok=false; try{ ok=document.execCommand("copy"); }catch{} document.body.removeChild(ta); return ok;
+  async function oauth(){
+    const state = randomId();
+    localStorage.setItem('oauth_state', state);
+    const params = new URLSearchParams({
+      response_type: 'token',
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      redirect_uri: REDIRECT_URI,
+      state,
+      show_dialog: 'true'
+    });
+    window.location.href = `https://accounts.spotify.com/authorize?${params}`;
+  }
+
+  function parseUrl(){
+    const frag = window.location.hash.substring(1);
+    if (!frag) return {};
+    const obj = {};
+    for (const kv of frag.split('&')){
+      const [k, v] = kv.split('=');
+      if (k && v) obj[k] = decodeURIComponent(v);
     }
-  }
-  async function autoCopyWithGestureFallback(text){
-    if (await robustCopy(text)) { statusB.textContent="Copied!"; statusB.classList.remove("err"); statusB.classList.add("ok"); return; }
-    statusB.textContent="Tap anywhere or press a key to copy…";
-    const once = async () => {
-      window.removeEventListener("pointerdown", once);
-      window.removeEventListener("keydown", once);
-      const ok = await robustCopy(text);
-      statusB.textContent = ok ? "Copied!" : "Copy failed. Use Manual Copy.";
-      statusB.classList.toggle("ok", ok);
-      statusB.classList.toggle("err", !ok);
-    };
-    window.addEventListener("pointerdown", once, {once:true});
-    window.addEventListener("keydown", once, {once:true});
+    return obj;
   }
 
-  document.getElementById('btn-login').addEventListener('click', async ()=>{
-    const verifier = rand(64); const challenge = b64url(await sha256(verifier));
-    sessionStorage.setItem('pkce_verifier', verifier);
-    const state = rand(12); sessionStorage.setItem('state', state);
-    const q = new URLSearchParams({response_type:"code",client_id:CLIENT_ID,redirect_uri:REDIRECT_URI,scope:SCOPES,code_challenge_method:"S256",code_challenge:challenge,state});
-    location.href = "https://accounts.spotify.com/authorize?" + q.toString();
-  });
+  async function handleToken(){
+    const { access_token, state, error } = parseUrl();
+    if (error) {
+      statusA.textContent = '🚫 Authorization failed.';
+      statusA.className = 'muted err';
+      return;
+    }
+    if (!access_token) return;
 
-  (async function handleReturn(){
-    const qs = new URLSearchParams(location.search);
-    if (qs.get("error")) { statusA.textContent="Authorization cancelled."; history.replaceState({}, "", REDIRECT_URI); return; }
-    const code = qs.get("code"), state = qs.get("state"); if (!code) return;
-    const stored = sessionStorage.getItem("state"); sessionStorage.removeItem("state");
-    if (!state || state !== stored) { statusA.textContent="State mismatch. Try again."; history.replaceState({}, "", REDIRECT_URI); return; }
+    const saved = localStorage.getItem('oauth_state');
+    if (state !== saved) {
+      statusA.textContent = '🚫 State mismatch.';
+      statusA.className = 'muted err';
+      return;
+    }
 
+    localStorage.removeItem('oauth_state');
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    // display token
+    screenA.classList.add('hide');
+    screenB.classList.remove('hide');
+    tokenBox.value = access_token;
+
+    statusB.textContent = '✅ Success! This token expires in 1 hour.';
+    statusB.className = 'muted ok';
+  }
+
+  btnLogin.addEventListener('click', oauth);
+  btnCopy.addEventListener('click', async () => {
     try {
-      const verifier = sessionStorage.getItem("pkce_verifier") || ""; sessionStorage.removeItem("pkce_verifier");
-      const body = new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:REDIRECT_URI,client_id:CLIENT_ID,code_verifier:verifier});
-      const r = await fetch("https://accounts.spotify.com/api/token", {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
-      const tok = await r.json(); if (!r.ok) throw new Error(JSON.stringify(tok));
-      const rt = tok.refresh_token || ""; if (!rt) throw new Error("No refresh_token returned.");
-      setToken(rt); go("B"); await autoCopyWithGestureFallback(rt);
-    } catch (e) {
-      statusA.textContent="Token exchange failed. Please try again."; console.error(e);
-    } finally { history.replaceState({}, "", REDIRECT_URI); }
-  })();
-
-  document.getElementById('btn-copy')?.addEventListener('click', async ()=>{
-    const ok = await robustCopy(tokenBox.value);
-    statusB.textContent = ok ? "Copied!" : "Copy failed. Select the field and copy.";
-    statusB.classList.toggle("ok", ok);
-    statusB.classList.toggle("err", !ok);
+      await navigator.clipboard.writeText(tokenBox.value);
+      statusB.textContent = '📋 Copied to clipboard!';
+      statusB.className = 'muted ok';
+    } catch {
+      tokenBox.select();
+      statusB.textContent = '📋 Selected — press Ctrl+C to copy.';
+      statusB.className = 'muted';
+    }
   });
+
+  handleToken();
 });
 </script>
 </body>
 </html>
-
