@@ -82,11 +82,12 @@
     min-width:10px; /* measured & set at runtime */
     height:1em; line-height:1; /* ensure stable line-box */
   }
-  .suffixText{ color:#fff; letter-spacing:0; display:inline-block; white-space:nowrap; line-height:1; vertical-align:baseline; }
+  .suffixText{ color:#fff; letter-spacing:0; display:inline; white-space:nowrap; line-height:1; vertical-align:baseline; }
   .caret{
     position:absolute; left:0; top:0.032em; display:block; width:0.055em; height:0.95em; background:#fff;
     /* margin handled via JS positioning to hug text */
     will-change:transform, opacity;
+    transform:translateX(var(--caretX, 0px));
   }
   @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.18}}
   .blink{animation:blink 950ms step-end infinite}
@@ -427,8 +428,8 @@ window.addEventListener('DOMContentLoaded', () => {
       // Blue streaks
       stepDrawStreaks(t);
       // Shooting stars
-      maybeSpawnStar(now, w, h);
-      stepDrawStars(ctx, w, h, dt);
+      maybeSpawnStar(now);
+      stepDrawStars(dt);
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       if (!prefersReduced) requestAnimationFrame(draw);
@@ -537,8 +538,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const advancesCheat = computeAdvances('cheat.cc');
     const advancesIfy = computeAdvances('ify');
     function toDevicePx(x){ const dpr = window.devicePixelRatio||1; return Math.round(x*dpr)/dpr; }
-    function setCaretFor(text, i){
-      const adv = text==='cheat.cc'? advancesCheat[i] : text==='ify'? advancesIfy[i] : measureWidth(text.slice(0,i));
+    function setCaretFor(_text, _i){
+      const adv = measurePrefixWidth(suffix.textContent);
       const px = toDevicePx(adv + 6);
       caret.style.transform = 'translateX(' + px + 'px)';
     }
@@ -564,7 +565,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     }
     const type = makeStepperWithCache(true);
-    const eraseToZero = (cps)=> makeStepperWithCache(false)('', cps);
+    const eraseToZero = (word, cps)=> makeStepperWithCache(false)(word, cps);
 
     let firstCycleDone = false;
     async function loop(){
@@ -572,15 +573,17 @@ window.addEventListener('DOMContentLoaded', () => {
         caret.classList.remove('blink');
         suffix.textContent = '';
         positionCaret();
-        await type('cheat.cc', 4);
+        let currentWord = 'cheat.cc';
+        await type(currentWord, 4);
         caret.classList.add('blink');
         await sleep(1400 + Math.random()*200);
-        await eraseToZero(4);
+        await eraseToZero(currentWord, 4);
         if (!prefersReduced){ caret.style.opacity='0'; await sleep(220 + Math.random()*80); caret.style.opacity=''; }
-        await type('ify', 3);
+        currentWord = 'ify';
+        await type(currentWord, 3);
         caret.classList.add('blink');
         await sleep(2600 + Math.random()*400);
-        await eraseToZero(3);
+        await eraseToZero(currentWord, 3);
         caret.classList.add('blink');
         await sleep(500);
         if (!firstCycleDone){
