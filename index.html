@@ -134,20 +134,20 @@
   .muted{opacity:.72; font-size:.95rem; text-align:center; margin-top:10px}
   .ok{color:#9ae6a0} .err{color:#ff8c8c}
 
-  /* Custom cursor — glow ring only */
+  /* Custom cursor — pure glow */
   .cursorRing{
     position:fixed; left:50%; top:50%;
     width:1px; height:1px; border-radius:50%; pointer-events:none;
     z-index:9999; /* always above */
     background:transparent; border:none; mix-blend-mode:screen;
     box-shadow:
-      0 0 24px rgba(90,140,255,.18),
-      0 0 48px rgba(90,140,255,.12),
-      0 0 80px rgba(90,140,255,.085),
-      0 0 160px rgba(90,140,255,.07),
-      0 0 240px rgba(90,140,255,.045),
-      0 0 320px rgba(90,140,255,.032),
-      0 0 480px rgba(90,140,255,.025);
+      0 0 24px  rgba(90,140,255,0.18),
+      0 0 48px  rgba(90,140,255,0.12),
+      0 0 80px  rgba(90,140,255,0.10),
+      0 0 160px rgba(90,140,255,0.08),
+      0 0 240px rgba(90,140,255,0.06),
+      0 0 320px rgba(90,140,255,0.04),
+      0 0 480px rgba(90,140,255,0.025);
     transform:translate(-50%,-50%);
   }
 
@@ -427,8 +427,8 @@ window.addEventListener('DOMContentLoaded', () => {
       // Blue streaks
       stepDrawStreaks(t);
       // Shooting stars
-      maybeSpawnStar(now);
-      stepDrawStars(dt);
+      maybeSpawnStar(now, w, h);
+      stepDrawStars(ctx, w, h, dt);
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       if (!prefersReduced) requestAnimationFrame(draw);
