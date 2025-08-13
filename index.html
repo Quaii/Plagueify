@@ -24,6 +24,36 @@
   /* Frosted-glass + raindrops canvas (never intercepts clicks) */
   #bg{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none;}
 
+  /* Fixed decorative overlays stacked above canvas, below stage */
+  .fxLayer{position:fixed; inset:0; z-index:0; pointer-events:none}
+  /* Layer 1 — whisper tech grid */
+  .gridLayer{
+    opacity:.16; /* ≤ 0.25 overall */
+    mix-blend-mode:overlay;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(100,150,255,.12), rgba(100,150,255,.12) 1px, transparent 1px, transparent 24px),
+      repeating-linear-gradient(90deg, rgba(100,150,255,.12), rgba(100,150,255,.12) 1px, transparent 1px, transparent 24px);
+    /* Avoid moiré by letting the blend mask most of the grid on brights */
+  }
+  /* Layer 2 — soft blue bloom "nebula" */
+  .bloomLayer{
+    opacity:.6; /* combined under ~0.9 with blends */
+    mix-blend-mode:screen;
+    filter:blur(44px);
+    background:
+      radial-gradient(40% 40% at 28% 32%, rgba(109,165,255,.45), rgba(109,165,255,0) 60%),
+      radial-gradient(46% 46% at 72% 68%, rgba(58,109,245,.38), rgba(58,109,245,0) 62%),
+      radial-gradient(30% 30% at 50% 50%, rgba(74,130,255,.28), rgba(74,130,255,0) 65%);
+  }
+  /* Layer 3 — micro-grain for glass tooth */
+  .grainLayer{
+    opacity:.1; /* ≤ 0.12 */
+    mix-blend-mode:soft-light;
+    background-image: radial-gradient(rgba(255,255,255,.12) 0.5px, transparent 0.6px);
+    background-size: 3px 3px;
+    background-position: 0 0;
+  }
+
   .stage{position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; overflow:visible;}
   .container{width:min(820px,92vw); opacity:0; transform:translateY(8px) scale(.985)}
   .in{animation:fadeIn .7s cubic-bezier(.2,.75,.2,1) .05s forwards}
@@ -92,17 +122,28 @@
     position:fixed; left:50%; top:50%;
     width:42px; height:42px; border-radius:50%; pointer-events:none;
     z-index:9999; /* always above */
-    border:1px solid rgba(120,165,255,.55);
+    border:1px solid rgba(120,165,255,.6);
     box-shadow:
-      0 0 20px rgba(90,140,255,.35),
-      inset 0 0 22px rgba(90,140,255,.25);
+      0 0 24px rgba(90,140,255,.38),
+      inset 0 0 26px rgba(90,140,255,.3);
     transform:translate(-50%,-50%);
+  }
+
+  /* Respect reduced motion: hide overlays, stop caret blink */
+  @media (prefers-reduced-motion: reduce){
+    .gridLayer, .bloomLayer, .grainLayer{display:none !important}
+    .blink{animation:none}
   }
 </style>
 </head>
 <body>
   <!-- Frosted glass + raindrops -->
   <canvas id="bg" aria-hidden="true"></canvas>
+
+  <!-- Decorative layers -->
+  <div class="fxLayer gridLayer" aria-hidden="true"></div>
+  <div class="fxLayer bloomLayer" aria-hidden="true"></div>
+  <div class="fxLayer grainLayer" aria-hidden="true"></div>
 
   <!-- Custom glow cursor -->
   <div class="cursorRing" id="ring"></div>
@@ -145,23 +186,80 @@ window.addEventListener('DOMContentLoaded', () => {
   (function frosted(){
     const c = document.getElementById('bg');
     const ctx = c.getContext('2d');
-    let w,h,dpr, drops=[];
+    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let w,h,dpr;
+    let dropsBack=[], dropsMid=[], dropsFront=[], heroOrbs=[];
+    let lastT = performance.now();
+    // Parallax tracking
+    let tpx = 0, tpy = 0, ppx = 0, ppy = 0;
+    function onPointer(e){
+      const p = e.touches? e.touches[0]: e;
+      const nx = (p.clientX / w) - 0.5;
+      const ny = (p.clientY / h) - 0.5;
+      tpx = nx; tpy = ny;
+    }
+    if (!prefersReduced){
+      addEventListener('pointermove', onPointer, {passive:true});
+      addEventListener('touchmove', onPointer, {passive:true});
+    }
 
     function resize(){
       w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
       c.style.width = w+'px'; c.style.height = h+'px';
       c.width = (w*dpr)|0; c.height = (h*dpr)|0;
       ctx.setTransform(dpr,0,0,dpr,0,0);
-      // rebuild drops
-      const count = Math.floor((w*h)/38000); // scale with screen
-      drops = new Array(count).fill(0).map(()=>spawn());
+      // rebuild drops by strata
+      const baseCount = Math.floor((w*h)/38000);
+      const MAX_TOTAL = 900; // safety cap for ultra-wide
+      const backCount = Math.max(0, Math.floor(baseCount*0.5));
+      const midCount  = Math.max(0, Math.floor(baseCount*0.35));
+      const frontCount= Math.max(0, Math.floor(baseCount*0.15));
+      const heroCount = Math.max(5, Math.min(8, Math.floor((w+h)/1200)));
+      const total = backCount+midCount+frontCount+heroCount;
+      const scale = total>MAX_TOTAL ? MAX_TOTAL/total : 1;
+
+      function fill(count, kind){
+        return new Array(Math.floor(count*scale)).fill(0).map(()=>spawn(kind));
+      }
+      dropsBack = fill(backCount, 'back');
+      dropsMid  = fill(midCount,  'mid');
+      dropsFront= fill(frontCount,'front');
+      heroOrbs  = fill(heroCount, 'hero');
     }
-    function spawn(){
-      const r = 1 + Math.random()*2.2;
+    function spawn(kind){
+      const layer = kind;
+      let r, vy, sway, alpha;
+      if (layer==='back'){
+        r = 0.8 + Math.random()*1.2;
+        vy = 0.6 + Math.random()*1.1; // faster
+        sway = (Math.random()-.5)*0.28;
+        alpha = 0.14 + Math.random()*0.18;
+      } else if (layer==='mid'){
+        r = 1 + Math.random()*2.2;
+        vy = 0.3 + Math.random()*0.8; // original feel
+        sway = (Math.random()-.5)*0.25;
+        alpha = 0.18 + Math.random()*0.25;
+      } else if (layer==='front'){
+        r = 2.2 + Math.random()*3.2;
+        vy = 0.18 + Math.random()*0.45; // slower
+        sway = (Math.random()-.5)*0.22;
+        alpha = 0.16 + Math.random()*0.22;
+      } else { // hero
+        r = 6 + Math.random()*10;
+        vy = 0.05 + Math.random()*0.12; // very slow
+        sway = (Math.random()-.5)*0.18;
+        alpha = 0.10 + Math.random()*0.14;
+      }
+      const twinkle = Math.random() < 0.13 && layer!=='hero';
       return {
         x: Math.random()*w, y: Math.random()*h,
-        r, vy: 0.3 + Math.random()*0.8, sway: (Math.random()-.5)*0.25,
-        hue: 215 + Math.random()*18, alpha: 0.18 + Math.random()*0.25
+        r, vy, sway,
+        hue: 215 + Math.random()*18,
+        alpha,
+        twinkle,
+        twFreq: 0.6 + Math.random()*0.8,
+        twPhase: Math.random()*Math.PI*2,
+        layer
       };
     }
     function drawGlass(){
@@ -172,22 +270,45 @@ window.addEventListener('DOMContentLoaded', () => {
       ctx.fillStyle = g;
       ctx.fillRect(0,0,w,h);
     }
-    function draw(){
-      drawGlass();
-      ctx.globalCompositeOperation = 'lighter';
-      for (const d of drops){
+    function stepAndDrawSet(set, t){
+      for (const d of set){
         d.y += d.vy; d.x += d.sway;
         if (d.y - d.r > h+10) { d.y = -10; d.x = Math.random()*w; }
-        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${d.alpha})`;
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = `hsla(${d.hue}, 80%, 60%, ${d.alpha*0.65})`;
+        const tw = d.twinkle ? (0.88 + 0.12*Math.sin(t*d.twFreq + d.twPhase)) : 1;
+        const a = d.alpha * tw;
+        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${a})`;
+        ctx.fillStyle   = `hsla(${d.hue}, 80%, 60%, ${a*0.65})`;
+        ctx.shadowBlur  = d.layer==='hero' ? 24 : (d.layer==='front' ? 18 : (d.layer==='mid' ? 14 : 10));
         ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
       }
+    }
+    function draw(now){
+      const dt = Math.min(100, now - lastT); // clamp
+      lastT = now;
+      const t = now/1000;
+      // Ease parallax
+      ppx += (tpx - ppx) * 0.06;
+      ppy += (tpy - ppy) * 0.06;
+      drawGlass();
+      ctx.globalCompositeOperation = 'screen';
+      // Back layer parallax (largest shift)
+      ctx.save(); ctx.translate(ppx*12, ppy*12); stepAndDrawSet(dropsBack, t); ctx.restore();
+      // Mid layer parallax
+      ctx.save(); ctx.translate(ppx*8, ppy*8); stepAndDrawSet(dropsMid, t); ctx.restore();
+      // Front layer parallax
+      ctx.save(); ctx.translate(ppx*5, ppy*5); stepAndDrawSet(dropsFront, t); ctx.restore();
+      // Hero orbs minimal shift to keep legible
+      ctx.save(); ctx.translate(ppx*3, ppy*3); stepAndDrawSet(heroOrbs, t); ctx.restore();
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
+      if (!prefersReduced) requestAnimationFrame(draw);
+    }
+    resize(); addEventListener('resize', resize);
+    if (prefersReduced){
+      drawGlass();
+    } else {
       requestAnimationFrame(draw);
     }
-    resize(); addEventListener('resize', resize); draw();
   })();
 
   /* ================= Precise glow cursor (ring only) ================= */
