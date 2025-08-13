@@ -142,9 +142,9 @@
     z-index:9999; /* always above */
     background:transparent; border:none; mix-blend-mode:screen;
     box-shadow:
-      0 0 29px  rgba(90,140,255,0.27),
-      0 0 58px  rgba(90,140,255,0.18),
-      0 0 96px  rgba(90,140,255,0.15),
+      0 0 32px  rgba(90,140,255,0.28),
+      0 0 64px  rgba(90,140,255,0.20),
+      0 0 112px rgba(90,140,255,0.16),
       0 0 192px rgba(90,140,255,0.12),
       0 0 288px rgba(90,140,255,0.10),
       0 0 384px rgba(90,140,255,0.07),
@@ -160,7 +160,8 @@
   }
 
   /* Hide ring on coarse pointers (touch devices) */
-  @media (pointer: coarse){ .cursorRing{ display:none !important } }
+  /* Always show on hybrid/touch laptops; only hide for reduced motion */
+  @media (pointer: coarse){ .cursorRing{ display:block } }
 </style>
 </head>
 <body>
@@ -225,10 +226,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const ny = (p.clientY / h) - 0.5;
       tpx = nx; tpy = ny;
     }
-    if (!prefersReduced){
-      addEventListener('pointermove', onPointer, {passive:true});
-      addEventListener('touchmove', onPointer, {passive:true});
-    }
+    // Parallax inputs not needed now; keep disabled for minimal background
 
     function resize(){
       w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
