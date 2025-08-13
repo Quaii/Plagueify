@@ -101,6 +101,7 @@
 
   /* removed mute/volume styles */
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 </head>
 <body>
   <!-- Frosted glass + raindrops -->
@@ -145,53 +146,109 @@
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('container').classList.add('in');
 
-  /* ================= Frosted glass + glowing raindrops ================= */
+  /* ================= Frosted glass + glowing raindrops (AnimeJS) ================= */
   (function frosted(){
     const c = document.getElementById('bg');
     const ctx = c.getContext('2d');
-    let w,h,dpr, drops=[];
+    let w, h, dpr;
+    let drops = [];
+    let fallAnim = null;
+
+    function getAccentColor(){
+      const cs = getComputedStyle(document.documentElement);
+      const val = cs.getPropertyValue('--blue2').trim();
+      return val || '#3a6df5';
+    }
+
+    const accent = getAccentColor();
 
     function resize(){
       w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
       c.style.width = w+'px'; c.style.height = h+'px';
       c.width = (w*dpr)|0; c.height = (h*dpr)|0;
       ctx.setTransform(dpr,0,0,dpr,0,0);
-      // rebuild drops
-      const count = Math.floor((w*h)/38000); // scale with screen
-      drops = new Array(count).fill(0).map(()=>spawn());
+      buildDrops();
+      startAnimation();
     }
-    function spawn(){
-      const r = 1 + Math.random()*2.2;
-      return {
-        x: Math.random()*w, y: Math.random()*h,
-        r, vy: 0.3 + Math.random()*0.8, sway: (Math.random()-.5)*0.25,
-        hue: 215 + Math.random()*18, alpha: 0.18 + Math.random()*0.25
-      };
+
+    function buildDrops(){
+      const count = Math.max(24, Math.floor((w*h)/42000));
+      drops = new Array(count).fill(0).map(()=>{
+        const radius = 1 + Math.random()*2.2;
+        const startY = -20 - Math.random()*h;
+        const speed = 60 + Math.random()*120; // px/sec
+        return {
+          x: Math.random()*w,
+          y: startY,
+          y0: startY,
+          r: radius,
+          swayAmp: 0.5 + Math.random()*1.2,
+          swayHz: 0.08 + Math.random()*0.18,
+          alpha: 0.22 + Math.random()*0.25,
+          speed
+        };
+      });
     }
+
     function drawGlass(){
-      // soft frosted plate in center
-      const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
+      const g = ctx.createRadialGradient(
+        w*0.5, h*0.45, Math.min(w,h)*0.1,
+        w*0.5, h*0.45, Math.min(w,h)*0.6
+      );
       g.addColorStop(0, '#0f141f');
       g.addColorStop(1, '#0b0b0c');
       ctx.fillStyle = g;
       ctx.fillRect(0,0,w,h);
     }
-    function draw(){
+
+    function render(now){
       drawGlass();
       ctx.globalCompositeOperation = 'lighter';
       for (const d of drops){
-        d.y += d.vy; d.x += d.sway;
-        if (d.y - d.r > h+10) { d.y = -10; d.x = Math.random()*w; }
-        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${d.alpha})`;
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = `hsla(${d.hue}, 80%, 60%, ${d.alpha*0.65})`;
-        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
+        const sway = Math.sin(now * d.swayHz * 0.002 + d.y*0.01) * d.swayAmp;
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 16;
+        ctx.globalAlpha = d.alpha;
+        ctx.fillStyle = accent;
+        ctx.beginPath();
+        ctx.arc(d.x + sway, d.y, d.r, 0, Math.PI*2);
+        ctx.fill();
       }
+      ctx.globalAlpha = 1;
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
-      requestAnimationFrame(draw);
     }
-    resize(); addEventListener('resize', resize); draw();
+
+    function startAnimation(){
+      if (fallAnim) fallAnim.pause();
+
+      // Reset starting positions to keep loops seamless
+      for (const d of drops){ d.y = d.y0; }
+
+      fallAnim = anime({
+        targets: drops,
+        y: () => h + 30,
+        duration: d => ((h + 50) - d.y0) / d.speed * 1000,
+        delay: () => Math.random()*1200,
+        easing: 'linear',
+        loop: true,
+        update: () => render(performance.now())
+      });
+
+      // Subtle glow pulse
+      anime({
+        targets: drops,
+        alpha: d => [Math.max(0.12, d.alpha*0.8), Math.min(0.6, d.alpha*1.25)],
+        duration: () => 1400 + Math.random()*1400,
+        direction: 'alternate',
+        easing: 'easeInOutSine',
+        loop: true,
+        autoplay: true
+      });
+    }
+
+    resize();
+    addEventListener('resize', resize);
   })();
 
   /* ================= Precise glow cursor (ring only) ================= */
