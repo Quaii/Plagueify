@@ -80,10 +80,10 @@
     position:relative; display:inline-block; vertical-align:baseline;
     min-width:10px; /* measured & set at runtime */
   }
-  .suffixText{ color:#fff; letter-spacing:0; display:inline; }
+  .suffixText{ color:#fff; letter-spacing:0; display:block; position:absolute; left:0; top:0; white-space:nowrap; }
   .caret{
-    display:inline-block; width:0.055em; height:0.95em; background:#fff;
-    margin-left:6px; vertical-align:-0.05em;
+    position:absolute; left:0; top:0; display:block; width:0.055em; height:0.95em; background:#fff;
+    /* margin handled via JS positioning to hug text */
   }
   @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.18}}
   .blink{animation:blink 950ms step-end infinite}
@@ -105,13 +105,24 @@
   .controls{text-align:center; margin-top:16px}
   .btn{
     appearance:none; border:1px solid var(--line); background:#1a1c21; color:var(--ink);
-    padding:12px 18px; border-radius:0; font-weight:700; letter-spacing:.2px; cursor:pointer;
+    padding:12px 18px; border-radius:0; font-weight:700; letter-spacing:.2px;
     transition:transform .12s, border-color .2s, box-shadow .2s, background .2s;
     box-shadow:0 12px 28px rgba(0,0,0,.28);
   }
   .btn:hover{ transform:translateY(-1px); border-color:#3a4050; background:#1f2228; box-shadow:0 16px 34px rgba(0,0,0,.36) }
   .hero{display:flex; flex-direction:column; align-items:center; gap:28px}
   .btn-cta{ padding:14px 22px }
+
+  /* Focus visibility for keyboard users */
+  .btn:focus-visible{
+    outline:2px solid #4a82ff; outline-offset:2px; border-color:#4a82ff;
+    box-shadow:0 0 0 4px rgba(74,130,255,.22), 0 12px 28px rgba(0,0,0,.28);
+  }
+  .token:focus-visible{
+    outline:2px solid #4a82ff; outline-offset:2px; border-color:#3c68ff;
+  }
+  /* Ensure OS cursor never shows on interactives */
+  a, button, [role="button"], input, textarea, select, .btn, .token { cursor:none; }
 
   .hide{display:none !important}
   .muted{opacity:.72; font-size:.95rem; text-align:center; margin-top:10px}
@@ -133,7 +144,11 @@
   @media (prefers-reduced-motion: reduce){
     .gridLayer, .bloomLayer, .grainLayer{display:none !important}
     .blink{animation:none}
+    .cursorRing{display:none !important}
   }
+
+  /* Hide ring on coarse pointers (touch devices) */
+  @media (pointer: coarse){ .cursorRing{ display:none !important } }
 </style>
 </head>
 <body>
@@ -155,8 +170,7 @@
         <h1 class="title" aria-live="polite">
           <span class="titleRow">
             <span class="blueGrad">Plague</span>
-            <span class="suffixLane"><span id="suffix" class="suffixText"></span></span>
-            <span id="caret" class="caret blink"></span>
+            <span class="suffixLane"><span id="suffix" class="suffixText"></span><span id="caret" class="caret blink"></span></span>
           </span>
         </h1>
         <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
@@ -314,13 +328,32 @@ window.addEventListener('DOMContentLoaded', () => {
   /* ================= Precise glow cursor (ring only) ================= */
   (function cursorRing(){
     const ring = document.getElementById('ring');
+    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isCoarse = matchMedia('(pointer: coarse)').matches;
+    if (prefersReduced || isCoarse){ ring.style.display='none'; return; }
     let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
+    let scale = 1, targetScale = 1;
+    let throttleFlip = false;
+    const heavy = (innerWidth*innerHeight*(window.devicePixelRatio||1)) > 5_000_000;
     function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
     addEventListener('pointermove', move, {passive:true});
-    addEventListener('touchmove', move, {passive:true});
+    function isInteractiveAt(x,y){
+      const el = document.elementFromPoint(x,y);
+      if (!el) return false;
+      const sel = 'button, a, [role="button"], input, textarea, select, .btn';
+      return el.closest(sel) != null;
+    }
     (function tick(){
+      if (heavy){ throttleFlip = !throttleFlip; if (throttleFlip){ requestAnimationFrame(tick); return; } }
       rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
+      const overInteractive = isInteractiveAt(tx,ty);
+      targetScale = overInteractive ? 1.12 : 1.0;
+      scale += (targetScale - scale) * 0.2;
       ring.style.left = rx+'px'; ring.style.top = ry+'px';
+      ring.style.transform = 'translate(-50%,-50%) scale(' + scale.toFixed(3) + ')';
+      ring.style.boxShadow = overInteractive
+        ? '0 0 28px rgba(90,140,255,.45), inset 0 0 30px rgba(90,140,255,.36)'
+        : '0 0 24px rgba(90,140,255,.38), inset 0 0 26px rgba(90,140,255,.3)';
       requestAnimationFrame(tick);
     })();
   })();
@@ -330,6 +363,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const suffixLane = document.querySelector('.suffixLane');
     const suffix = document.getElementById('suffix');
     const caret = document.getElementById('caret');
+    const titleEl = document.querySelector('h1.title');
+    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Measure max width using an offscreen span so center stays steady
     const measure = (text)=>{
@@ -347,38 +382,68 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    async function type(text, cps){ // time-based
-      const start = performance.now(); let i = 0;
-      while (i < text.length){
-        const elapsed = (performance.now()-start)/1000;
-        const target = Math.floor(elapsed*cps);
-        const next = Math.min(target, text.length);
-        while (i < next){
-          i++;
-          suffix.textContent = text.slice(0,i);
-          caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-        }
-        await new Promise(r=>requestAnimationFrame(r));
-      }
-    }
-    async function backspace(n, cps){
-      for (let i=0;i<n;i++){
-        suffix.textContent = suffix.textContent.slice(0,-1);
-        caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-        await sleep(1000/cps);
-      }
+    function positionCaret(){
+      const w = suffix.offsetWidth || 0;
+      caret.style.left = (w + 6) + 'px';
     }
 
+    async function type(text, cps){ // RAF/time-based stepper
+      const start = performance.now(); let i = 0;
+      return new Promise(resolve=>{
+        function tick(){
+          const elapsed = (performance.now()-start)/1000;
+          const target = Math.floor(elapsed*cps);
+          const next = Math.min(target, text.length);
+          if (next > i){
+            i = next;
+            suffix.textContent = text.slice(0,i);
+            positionCaret();
+            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          }
+          if (i >= text.length){ resolve(); return; }
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+    async function erase(toLen, cps){ // RAF/time-based erase
+      const start = performance.now(); const fromLen = suffix.textContent.length;
+      return new Promise(resolve=>{
+        function tick(){
+          const elapsed = (performance.now()-start)/1000;
+          const target = Math.floor(elapsed*cps);
+          const next = Math.max(fromLen - target, toLen);
+          if (suffix.textContent.length !== next){
+            suffix.textContent = suffix.textContent.slice(0, next);
+            positionCaret();
+            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          }
+          if (next <= toLen){ resolve(); return; }
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+
+    let firstCycleDone = false;
     async function loop(){
       while(true){
         suffix.textContent = '';
+        positionCaret();
         await type('cheat.cc', 7);     // slower
         await sleep(900);
-        await backspace('cheat.cc'.length, 7); // slow erase
+        await erase(0, 7); // slow erase
+        if (!prefersReduced){ caret.style.opacity='0'; await sleep(240); caret.style.opacity=''; }
         await type('ify', 4);          // extra slow
         await sleep(1800);
-        await backspace('ify'.length, 9);
+        await erase(0, 9);
         await sleep(500);
+        if (!firstCycleDone){
+          firstCycleDone = true;
+          if (titleEl && titleEl.getAttribute('aria-live')){
+            titleEl.removeAttribute('aria-live');
+          }
+        }
       }
     }
     loop();
