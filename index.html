@@ -21,16 +21,10 @@
     overflow:hidden; cursor:none; /* we draw our own */
   }
 
-  /* Layered background for glassmorphism */
-  #underlay{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none;}
-  .glass{position:fixed; inset:0; z-index:1; pointer-events:none;
-    background:rgba(18,20,28,.35);
-    -webkit-backdrop-filter:blur(12px) saturate(120%) contrast(110%);
-    backdrop-filter:blur(12px) saturate(120%) contrast(110%);
-  }
-  #drops{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:2; pointer-events:none;}
+  /* Frosted-glass + raindrops canvas (never intercepts clicks) */
+  #bg{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none;}
 
-  .stage{position:relative; z-index:3; height:100%; display:grid; place-items:center; padding:24px; overflow:visible;}
+  .stage{position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; overflow:visible;}
   .container{width:min(820px,92vw); opacity:0; transform:translateY(8px) scale(.985)}
   .in{animation:fadeIn .7s cubic-bezier(.2,.75,.2,1) .05s forwards}
   @keyframes fadeIn{to{opacity:1; transform:translateY(0) scale(1)}}
@@ -107,15 +101,10 @@
 
   /* removed mute/volume styles */
 </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
 </head>
 <body>
-  <!-- Underlay lights -->
-  <canvas id="underlay" aria-hidden="true"></canvas>
-  <!-- True glassmorphism pane -->
-  <div class="glass" aria-hidden="true"></div>
-  <!-- Raindrops on glass -->
-  <canvas id="drops" aria-hidden="true"></canvas>
+  <!-- Frosted glass + raindrops -->
+  <canvas id="bg" aria-hidden="true"></canvas>
 
   <!-- Custom glow cursor -->
   <div class="cursorRing" id="ring"></div>
@@ -156,169 +145,53 @@
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('container').classList.add('in');
 
-  /* ================= Layered scene: lights underlay + CSS glass + drops ================= */
-  (function layeredGlass(){
-    // Underlay: animated soft lights so blur is visible
-    const ul = document.getElementById('underlay');
-    const uctx = ul.getContext('2d');
-    // Drops canvas: drawn on top of glass
-    const dc = document.getElementById('drops');
-    const dctx = dc.getContext('2d');
-    let w, h, dpr;
-    let drops = [];
-    let fallAnim = null; let pulseAnim = null; let lightsAnim = null;
-    let noisePattern = null;
-
-    function getVar(name, fallback){
-      const cs = getComputedStyle(document.documentElement);
-      return (cs.getPropertyValue(name) || '').trim() || fallback;
-    }
-    const colorTop = getVar('--blue1', '#6da5ff');
-    const colorMid = getVar('--blue3', '#4a82ff');
-    const colorBot = getVar('--blue2', '#3a6df5');
-    const baseBg = getVar('--bg', '#0b0b0c');
-
-    function makeNoisePattern(){
-      const n = document.createElement('canvas');
-      const s = 120; n.width = s; n.height = s;
-      const nctx = n.getContext('2d');
-      const img = nctx.createImageData(s, s);
-      for (let i=0;i<img.data.length;i+=4){
-        const v = 220 + (Math.random()*35|0); // light specks
-        img.data[i] = v; img.data[i+1] = v; img.data[i+2] = v; img.data[i+3] = 18; // very low alpha
-      }
-      nctx.putImageData(img, 0, 0);
-      return ctx.createPattern(n, 'repeat');
-    }
+  /* ================= Frosted glass + glowing raindrops ================= */
+  (function frosted(){
+    const c = document.getElementById('bg');
+    const ctx = c.getContext('2d');
+    let w,h,dpr, drops=[];
 
     function resize(){
       w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
-      for (const [cnv, ctx] of [[ul,uctx],[dc,dctx]]){
-        cnv.style.width = w+'px'; cnv.style.height = h+'px';
-        cnv.width = (w*dpr)|0; cnv.height = (h*dpr)|0;
-        ctx.setTransform(dpr,0,0,dpr,0,0);
-      }
-      if (!noisePattern) noisePattern = makeNoisePattern();
-      buildDrops();
-      startAnimation();
+      c.style.width = w+'px'; c.style.height = h+'px';
+      c.width = (w*dpr)|0; c.height = (h*dpr)|0;
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      // rebuild drops
+      const count = Math.floor((w*h)/38000); // scale with screen
+      drops = new Array(count).fill(0).map(()=>spawn());
     }
-
-    function buildDrops(){
-      const count = Math.max(36, Math.floor((w*h)/36000));
-      drops = new Array(count).fill(0).map(()=>{
-        const startY = -20 - Math.random()*h;
-        const speed = 70 + Math.random()*150; // px/sec
-        const length = 14 + Math.random()*42;
-        const thickness = 1 + Math.random()*1.5;
-        return {
-          x: Math.random()*w,
-          y: startY,
-          y0: startY,
-          swayAmp: 0.4 + Math.random()*1.0,
-          swayHz: 0.06 + Math.random()*0.16,
-          alpha: 0.18 + Math.random()*0.24,
-          speed,
-          length,
-          thickness,
-          pulse: Math.random() < 0.45, // some pulse, some only glow
-          intensity: 1
-        };
-      });
+    function spawn(){
+      const r = 1 + Math.random()*2.2;
+      return {
+        x: Math.random()*w, y: Math.random()*h,
+        r, vy: 0.3 + Math.random()*0.8, sway: (Math.random()-.5)*0.25,
+        hue: 215 + Math.random()*18, alpha: 0.18 + Math.random()*0.25
+      };
     }
-
-    function drawUnderlay(now){
-      // Deep base
-      uctx.fillStyle = baseBg;
-      uctx.fillRect(0,0,w,h);
-      // Moving soft lights so glass blur is perceivable
-      const blobs = 4;
-      for (let i=0;i<blobs;i++){
-        const t = now*0.00025 + i*1.37;
-        const x = (Math.sin(t*1.3)+1)/2 * w;
-        const y = (Math.cos(t*0.9)+1)/2 * h;
-        const r = Math.min(w,h) * (0.18 + 0.1*Math.sin(t*2+i));
-        const g = uctx.createRadialGradient(x,y,0,x,y,r);
-        const col = i%2===0 ? colorTop : colorBot;
-        g.addColorStop(0, col.replace(')',', 0.22)').replace('rgb','rgba'));
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        uctx.fillStyle = g;
-        uctx.beginPath(); uctx.arc(x,y,r,0,Math.PI*2); uctx.fill();
-      }
-      // Mild grain so blur has texture
-      uctx.globalAlpha = 0.08; uctx.fillStyle = noisePattern; uctx.fillRect(0,0,w,h); uctx.globalAlpha = 1;
+    function drawGlass(){
+      // soft frosted plate in center
+      const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
+      g.addColorStop(0, '#0f141f');
+      g.addColorStop(1, '#0b0b0c');
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,w,h);
     }
-
-    function renderDrops(now){
-      dctx.clearRect(0,0,w,h);
-      dctx.globalCompositeOperation = 'lighter';
+    function draw(){
+      drawGlass();
+      ctx.globalCompositeOperation = 'lighter';
       for (const d of drops){
-        const sway = Math.sin(now * d.swayHz * 0.002 + d.y*0.01) * d.swayAmp;
-        const g = dctx.createLinearGradient(0, d.y - d.length, 0, d.y);
-        g.addColorStop(0, colorTop);
-        g.addColorStop(0.6, colorMid);
-        g.addColorStop(1, colorBot);
-        dctx.shadowColor = colorBot;
-        dctx.shadowBlur = 14 * d.intensity;
-        dctx.globalAlpha = d.alpha;
-        dctx.strokeStyle = g;
-        dctx.lineWidth = d.thickness;
-        dctx.lineCap = 'round';
-        dctx.beginPath();
-        dctx.moveTo(d.x + sway, d.y - d.length);
-        dctx.lineTo(d.x + sway, d.y);
-        dctx.stroke();
-        if ((now/1000 + d.x)%7 < 0.02){
-          dctx.beginPath();
-          dctx.arc(d.x + sway, d.y, d.thickness*0.9, 0, Math.PI*2);
-          dctx.fillStyle = colorBot;
-          dctx.globalAlpha = d.alpha * 0.8;
-          dctx.fill();
-          dctx.globalAlpha = d.alpha;
-        }
+        d.y += d.vy; d.x += d.sway;
+        if (d.y - d.r > h+10) { d.y = -10; d.x = Math.random()*w; }
+        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${d.alpha})`;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = `hsla(${d.hue}, 80%, 60%, ${d.alpha*0.65})`;
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
       }
-      dctx.globalAlpha = 1; dctx.shadowBlur = 0; dctx.globalCompositeOperation = 'source-over';
+      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = 'source-over';
+      requestAnimationFrame(draw);
     }
-
-    function startAnimation(){
-      if (fallAnim) fallAnim.pause();
-      if (pulseAnim) pulseAnim.pause();
-      if (lightsAnim) lightsAnim.pause();
-      for (const d of drops){ d.y = d.y0; }
-
-      // Lights loop: redraw underlay
-      lightsAnim = anime({
-        duration: Infinity,
-        update: () => drawUnderlay(performance.now())
-      });
-
-      // Drips vertical movement
-      fallAnim = anime({
-        targets: drops,
-        y: () => h + 40,
-        duration: d => ((h + 60) - d.y0) / d.speed * 1000,
-        delay: () => Math.random()*1400,
-        easing: 'easeInQuad',
-        loop: true,
-        update: () => renderDrops(performance.now())
-      });
-
-      // Pulsing subset
-      const pulsing = drops.filter(d=>d.pulse);
-      if (pulsing.length){
-        pulseAnim = anime({
-          targets: pulsing,
-          intensity: d => [0.8, 1.25],
-          duration: () => 1600 + Math.random()*1600,
-          direction: 'alternate',
-          easing: 'easeInOutSine',
-          loop: true,
-          autoplay: true
-        });
-      }
-    }
-
-    resize();
-    addEventListener('resize', resize);
+    resize(); addEventListener('resize', resize); draw();
   })();
 
   /* ================= Precise glow cursor (ring only) ================= */
