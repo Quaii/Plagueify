@@ -21,33 +21,31 @@
     overflow:hidden; cursor:none; /* we draw our own */
   }
 
-  /* Frosted-glass + raindrops canvas (never intercepts clicks) */
+  /* Frosted-glass + particle canvas (never intercepts clicks) */
   #bg{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none;}
 
   /* Fixed decorative overlays stacked above canvas, below stage */
   .fxLayer{position:fixed; inset:0; z-index:0; pointer-events:none}
-  /* Layer 1 — whisper tech grid */
+  /* Disable lighting overlays to remove background glow/“shaved” look */
+  .gridLayer, .bloomLayer { display: none !important; }
   .gridLayer{
-    opacity:.16; /* ≤ 0.25 overall */
+    opacity:.10;
     mix-blend-mode:overlay;
     background-image:
       repeating-linear-gradient(0deg, rgba(100,150,255,.12), rgba(100,150,255,.12) 1px, transparent 1px, transparent 24px),
       repeating-linear-gradient(90deg, rgba(100,150,255,.12), rgba(100,150,255,.12) 1px, transparent 1px, transparent 24px);
-    /* Avoid moiré by letting the blend mask most of the grid on brights */
   }
-  /* Layer 2 — soft blue bloom "nebula" */
   .bloomLayer{
-    opacity:.6; /* combined under ~0.9 with blends */
+    opacity:.22;
     mix-blend-mode:screen;
     filter:blur(44px);
     background:
-      radial-gradient(40% 40% at 28% 32%, rgba(109,165,255,.45), rgba(109,165,255,0) 60%),
-      radial-gradient(46% 46% at 72% 68%, rgba(58,109,245,.38), rgba(58,109,245,0) 62%),
-      radial-gradient(30% 30% at 50% 50%, rgba(74,130,255,.28), rgba(74,130,255,0) 65%);
+      radial-gradient(40% 40% at 28% 32%, rgba(109,165,255,.28), rgba(109,165,255,0) 60%),
+      radial-gradient(46% 46% at 72% 68%, rgba(58,109,245,.22), rgba(58,109,245,0) 62%),
+      radial-gradient(30% 30% at 50% 50%, rgba(74,130,255,.18), rgba(74,130,255,0) 65%);
   }
-  /* Layer 3 — micro-grain for glass tooth */
   .grainLayer{
-    opacity:.1; /* ≤ 0.12 */
+    opacity:.1;
     mix-blend-mode:soft-light;
     background-image: radial-gradient(rgba(255,255,255,.12) 0.5px, transparent 0.6px);
     background-size: 3px 3px;
@@ -64,37 +62,20 @@
     font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
     font-weight:800; letter-spacing:.2px;
     font-size:clamp(48px,10vw,98px);
-    line-height:1; user-select:none; text-align:center; overflow:visible;
+    line-height:1.05; user-select:none; text-align:center;
     margin:0 0 36px 0; white-space:nowrap; overflow:visible;
-    text-shadow:0 0 10px rgba(90,140,255,.18); /* glow, not bloom */
+    text-shadow:0 0 10px rgba(90,140,255,.18);
+    overflow:visible;
   }
   .titleRow{display:inline-flex; align-items:baseline; gap:0; overflow:visible;}
-  .titleRow{white-space:nowrap; transform:translateX(var(--titleBias, 0px));}
-  .blueGrad{
-    background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-    filter:drop-shadow(0 0 8px rgba(90,140,255,.18));
-  }
+  .blueGrad{display:inline-block; padding-bottom:.08em;background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);-webkit-background-clip:text; background-clip:text; color:transparent;filter:drop-shadow(0 0 8px rgba(90,140,255,.18));}
 
-  /* Suffix lane: fixed width = width of longest word so centering doesn't shift */
-  .suffixLane{
-    position:relative; display:inline-flex; align-items:baseline; vertical-align:baseline;
-    min-width:10px; /* measured & set at runtime */
-    height:1em; line-height:1; /* ensure stable line-box */
-    width:var(--suffixWidth, auto);
-  }
-  .suffixText{ color:#fff; letter-spacing:0; display:inline; white-space:nowrap; line-height:1; vertical-align:baseline; }
-  .caret{
-    position:absolute; left:0; top:0.032em; display:block; width:0.055em; height:0.95em; background:#fff;
-    /* margin handled via JS positioning to hug text */
-    will-change:transform, opacity;
-    transform:translateX(var(--caretX, 0px));
-  }
+  /* Suffix lane — removed left margin so it's tight after the "E" */
+  .suffixLane{ position:relative; display:inline-block; vertical-align:baseline; min-width:10px; margin-left:0; }
+  .suffixText{ color:#fff; letter-spacing:0; display:inline-block; position:relative; white-space:nowrap; }
+  .caret{ position:absolute; left:0; top:0; display:block; width:0.055em; height:0.9em; background:#fff; }
   @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.18}}
   .blink{animation:blink 950ms step-end infinite}
-  /* Softer caret blink for idle state */
-  @keyframes caretBlink{0%,100%{opacity:1}50%{opacity:0}}
-  .caret.blink{animation:caretBlink 1s step-end infinite; transition:opacity .15s ease}
   @keyframes jiggle{0%{transform:translateY(0)}50%{transform:translateY(-1px)}100%{transform:translateY(0)}}
 
   /* Token UI */
@@ -119,7 +100,7 @@
   }
   .btn:hover{ transform:translateY(-1px); border-color:#3a4050; background:#1f2228; box-shadow:0 16px 34px rgba(0,0,0,.36) }
   .hero{display:flex; flex-direction:column; align-items:center; gap:28px}
-  .btn-cta{ padding:14px 22px }
+  .btn-cta{ padding:14px 22px; margin-top:-10px; } /* move CTA up by 10px */
 
   /* Focus visibility for keyboard users */
   .btn:focus-visible{
@@ -136,32 +117,25 @@
   .muted{opacity:.72; font-size:.95rem; text-align:center; margin-top:10px}
   .ok{color:#9ae6a0} .err{color:#ff8c8c}
 
-  /* Custom cursor — pure glow */
-  .cursorRing{
-    position:fixed; left:50%; top:50%;
-    width:1px; height:1px; border-radius:50%; pointer-events:none;
-    z-index:999999; /* always above */
-    background:transparent; border:none; mix-blend-mode:screen;
-    box-shadow:
-      0 0 32px  rgba(90,140,255,0.28),
-      0 0 64px  rgba(90,140,255,0.20),
-      0 0 112px rgba(90,140,255,0.16),
-      0 0 192px rgba(90,140,255,0.12),
-      0 0 288px rgba(90,140,255,0.12),
-      0 0 384px rgba(90,140,255,0.085),
-      0 0 576px rgba(90,140,255,0.055);
-    transform:translate(-50%,-50%);
-  }
+  /* Custom cursor — stronger glow ring + glow dot */
+  .cursorRing{position:fixed; left:50%; top:50%; width:10px; height:10px; border-radius:50%; pointer-events:none; z-index:9999; border:none; background:transparent; box-shadow:0 0 30px rgba(90,140,255,0.85), 0 0 60px rgba(90,140,255,0.75), 0 0 90px rgba(90,140,255,0.65), 0 0 120px rgba(90,140,255,0.5); transform:translate(-50%,-50%);}
+  .cursorDot{position:fixed; left:50%; top:50%; width:6px; height:6px; border-radius:50%; pointer-events:none; z-index:9999; background:rgba(200,215,255,1); box-shadow:0 0 20px rgba(90,140,255,1), 0 0 40px rgba(90,140,255,0.85), 0 0 80px rgba(90,140,255,0.7); transform:translate(-50%,-50%);}
 
-  /* Respect reduced motion: hide overlays, stop caret blink (cursor handled in JS) */
+  /* Respect reduced motion: hide overlays + custom cursor */
   @media (prefers-reduced-motion: reduce){
     .gridLayer, .bloomLayer, .grainLayer{display:none !important}
     .blink{animation:none}
+    .cursorRing, .cursorDot{display:none !important}
+  }
+
+  /* Hide cursor on coarse pointers (touch devices) */
+  @media (pointer: coarse){
+    .cursorRing, .cursorDot{display:none !important}
   }
 </style>
 </head>
 <body>
-  <!-- Frosted glass + raindrops -->
+  <!-- Particle canvas -->
   <canvas id="bg" aria-hidden="true"></canvas>
 
   <!-- Decorative layers -->
@@ -170,7 +144,8 @@
   <div class="fxLayer grainLayer" aria-hidden="true"></div>
 
   <!-- Custom glow cursor -->
-  <div class="cursorRing" id="cursor-ring" aria-hidden="true"></div>
+  <div class="cursorRing" id="ring"></div>
+  <div class="cursorDot" id="dot"></div>
 
   <div class="stage">
     <div class="container" id="container">
@@ -179,7 +154,7 @@
         <h1 class="title" aria-live="polite">
           <span class="titleRow">
             <span class="blueGrad">Plague</span>
-            <span class="suffixLane"><span id="suffix" class="suffixText"></span><span id="caret" class="caret"></span></span>
+            <span class="suffixLane"><span id="suffix" class="suffixText"></span><span id="caret" class="caret blink"></span></span>
           </span>
         </h1>
         <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
@@ -205,14 +180,13 @@
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('container').classList.add('in');
 
-  /* ================= Frosted glass + glowing raindrops ================= */
+  /* ================= Frosted glass + floating particles (no lightning) ================= */
   (function frosted(){
     const c = document.getElementById('bg');
     const ctx = c.getContext('2d');
     const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let w,h,dpr;
-    let dropsBack=[], dropsMid=[];
-    // No blue streaks
+    let dropsBack=[], dropsMid=[], dropsFront=[], heroOrbs=[];
     let lastT = performance.now();
     // Parallax tracking
     let tpx = 0, tpy = 0, ppx = 0, ppy = 0;
@@ -222,37 +196,65 @@ window.addEventListener('DOMContentLoaded', () => {
       const ny = (p.clientY / h) - 0.5;
       tpx = nx; tpy = ny;
     }
-    // Parallax inputs not needed now; keep disabled for minimal background
+    if (!prefersReduced){
+      addEventListener('pointermove', onPointer, {passive:true});
+      addEventListener('touchmove', onPointer, {passive:true});
+    }
 
     function resize(){
       w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
       c.style.width = w+'px'; c.style.height = h+'px';
       c.width = (w*dpr)|0; c.height = (h*dpr)|0;
       ctx.setTransform(dpr,0,0,dpr,0,0);
-      // rebuild drops by strata (small lively only)
-      const baseCount = Math.floor((w*h)/30000);
-      const MAX_TOTAL = 900; // safety cap for ultra-wide
-      const backCount = 0;
-      const midCount  = 0;
-      const total = backCount+midCount;
+
+      // base population from area
+      const baseCount = Math.floor((w*h)/20000);
+
+      // double particle amounts (locked from previous change)
+      const backCount = Math.max(0, Math.floor(baseCount*0.40) * 2);
+      const midCount  = Math.max(0, Math.floor(baseCount*0.38) * 2);
+      const frontCount= Math.max(0, Math.floor(baseCount*0.22) * 2);
+      const heroCount = 0;
+
+      const MAX_TOTAL = 1400; // safety cap for ultra-wide
+      const total = backCount+midCount+frontCount+heroCount;
       const scale = total>MAX_TOTAL ? MAX_TOTAL/total : 1;
 
       function fill(count, kind){
         return new Array(Math.floor(count*scale)).fill(0).map(()=>spawn(kind));
       }
-      // dropsBack = fill(backCount, 'back');
-      // dropsMid  = fill(midCount,  'mid');
-      // no streak pool
+      dropsBack = fill(backCount, 'back');
+      dropsMid  = fill(midCount,  'mid');
+      dropsFront= fill(frontCount,'front');
+      heroOrbs  = fill(heroCount, 'hero');
     }
+
     function spawn(kind){
       const layer = kind;
+      // slightly larger particle radii everywhere (~+20%)
       let r, vy, sway, alpha;
-      // small lively drops only
-      r = 0.8 + Math.random()*1.6;           // 0.8–2.4
-      vy = 0.35 + Math.random()*0.55;        // 0.35–0.9
-      sway = (Math.random()-.5)*0.20;        // subtle sway
-      alpha = 0.14 + Math.random()*0.18;
-      const twinkle = Math.random() < 0.15;
+      if (layer==='back'){
+        r = (0.6 + Math.random()*0.8) * 1.2;
+        vy = 0.6 + Math.random()*1.1;
+        sway = (Math.random()-.5)*0.28;
+        alpha = 0.14 + Math.random()*0.18;
+      } else if (layer==='mid'){
+        r = (0.8 + Math.random()*1.2) * 1.2;
+        vy = 0.3 + Math.random()*0.8;
+        sway = (Math.random()-.5)*0.25;
+        alpha = 0.14 + Math.random()*0.22;
+      } else if (layer==='front'){
+        r = (1.2 + Math.random()*1.4) * 1.2;
+        vy = 0.18 + Math.random()*0.45;
+        sway = (Math.random()-.5)*0.22;
+        alpha = 0.12 + Math.random()*0.18;
+      } else { // hero (unused)
+        r = (6 + Math.random()*10) * 1.2;
+        vy = 0.05 + Math.random()*0.12;
+        sway = (Math.random()-.5)*0.18;
+        alpha = 0.10 + Math.random()*0.14;
+      }
+      const twinkle = false; // disable flash to remove any "lightning" feel
       return {
         x: Math.random()*w, y: Math.random()*h,
         r, vy, sway,
@@ -264,33 +266,42 @@ window.addEventListener('DOMContentLoaded', () => {
         layer
       };
     }
+
     function drawGlass(){
-      // soft frosted plate in center
-      const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
-      g.addColorStop(0, '#0f141f');
-      g.addColorStop(1, '#0b0b0c');
-      ctx.fillStyle = g;
+      ctx.fillStyle = '#0b0b0c';
       ctx.fillRect(0,0,w,h);
     }
-    // No particle step/draw — background is frosted plate only
+
+    function stepAndDrawSet(set, t){
+      for (const d of set){
+        d.y += d.vy; d.x += d.sway;
+        if (d.y - d.r > h+10) { d.y = -10; d.x = Math.random()*w; }
+        const a = d.alpha; // no twinkle
+        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${a})`;
+        ctx.fillStyle   = `hsla(${d.hue}, 80%, 60%, ${a*0.65})`;
+        ctx.shadowBlur = d.layer==='front' ? 12 : (d.layer==='mid' ? 9 : 7);
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
     function draw(now){
       const dt = Math.min(100, now - lastT); // clamp
       lastT = now;
       const t = now/1000;
-      // Ease parallax (snappier)
-      ppx += (tpx - ppx) * 0.08;
-      ppy += (tpy - ppy) * 0.08;
+      // Ease parallax
+      ppx += (tpx - ppx) * 0.06;
+      ppy += (tpy - ppy) * 0.06;
       drawGlass();
       ctx.globalCompositeOperation = 'screen';
-      // No particle layers
-      // No blue streaks
-      // Shooting stars removed
+      ctx.save(); ctx.translate(ppx*12, ppy*12); stepAndDrawSet(dropsBack, t); ctx.restore();
+      ctx.save(); ctx.translate(ppx*8,  ppy*8 ); stepAndDrawSet(dropsMid,  t); ctx.restore();
+      ctx.save(); ctx.translate(ppx*5,  ppy*5 ); stepAndDrawSet(dropsFront,t); ctx.restore();
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       if (!prefersReduced) requestAnimationFrame(draw);
     }
-    try { resize(); } catch(e){ console.warn('bg resize failed', e); }
-    addEventListener('resize', resize);
+
+    resize(); addEventListener('resize', resize);
     if (prefersReduced){
       drawGlass();
     } else {
@@ -298,20 +309,51 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  /* ================= Glow cursor (pure bloom) ================= */
-  (()=>{
-    const ring = document.getElementById('cursor-ring');
-    if (!ring) return;
-    const FORCE_SHOW = true;
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (prefersReduced && !FORCE_SHOW){ ring.style.display='none'; return; }
-    let tx = innerWidth/2, ty = innerHeight/2, x = tx, y = ty;
-    function onMove(e){ const p = e.touches? e.touches[0]: e; tx = p.clientX; ty = p.clientY; }
-    addEventListener('mousemove', onMove, {passive:true});
-    addEventListener('touchmove', onMove, {passive:true});
-    (function loop(){ x += (tx-x)*0.18; y += (ty-y)*0.18; ring.style.left = x+'px'; ring.style.top = y+'px'; requestAnimationFrame(loop); })();
-    const obs = new MutationObserver(()=> ring.parentNode?.appendChild(ring));
-    obs.observe(document.body, { childList:true });
+  /* ================= Precise glow cursor — ring + dot ================= */
+  (function cursorGlow(){
+    const ring = document.getElementById('ring');
+    const dot  = document.getElementById('dot');
+    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isCoarse = matchMedia('(pointer: coarse)').matches;
+    if (prefersReduced || isCoarse){ ring.style.display='none'; dot.style.display='none'; return; }
+
+    let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
+    let scale = 1, targetScale = 1;
+    let throttleFlip = false;
+    const heavy = (innerWidth*innerHeight*(window.devicePixelRatio||1)) > 5_000_000;
+
+    function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
+    addEventListener('pointermove', move, {passive:true});
+
+    function isInteractiveAt(x,y){
+      const el = document.elementFromPoint(x,y);
+      if (!el) return false;
+      const sel = 'button, a, [role="button"], input, textarea, select, .btn';
+      return el.closest(sel) != null;
+    }
+
+    (function tick(){
+      if (heavy){ throttleFlip = !throttleFlip; if (throttleFlip){ requestAnimationFrame(tick); return; } }
+      rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
+      const overInteractive = isInteractiveAt(tx,ty);
+      targetScale = overInteractive ? 1.12 : 1.0;
+      scale += (targetScale - scale) * 0.2;
+
+      const x = rx+'px', y = ry+'px', t = 'translate(-50%,-50%) scale(' + scale.toFixed(3) + ')';
+      ring.style.left = x; ring.style.top = y; ring.style.transform = t;
+      dot.style.left  = x; dot.style.top  = y; dot.style.transform  = t;
+
+      /* Stronger glow on hover and idle */
+      ring.style.boxShadow = overInteractive
+        ? '0 0 40px rgba(90,140,255,0.95), 0 0 80px rgba(90,140,255,0.85), 0 0 120px rgba(90,140,255,0.7)'
+        : '0 0 30px rgba(90,140,255,0.85), 0 0 60px rgba(90,140,255,0.75), 0 0 90px rgba(90,140,255,0.65)';
+
+      dot.style.boxShadow = overInteractive
+        ? '0 0 25px rgba(90,140,255,1), 0 0 50px rgba(90,140,255,0.9), 0 0 100px rgba(90,140,255,0.8)'
+        : '0 0 20px rgba(90,140,255,1), 0 0 40px rgba(90,140,255,0.85), 0 0 80px rgba(90,140,255,0.7)';
+
+      requestAnimationFrame(tick);
+    })();
   })();
 
   /* ================= Typing (suffix only, anchored, smooth, loop) ================= */
@@ -321,7 +363,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const caret = document.getElementById('caret');
     const titleEl = document.querySelector('h1.title');
     const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const titleRow = document.querySelector('.titleRow');
 
     // Measure max width using an offscreen span so center stays steady
     const measure = (text)=>{
@@ -336,106 +377,70 @@ window.addEventListener('DOMContentLoaded', () => {
     };
     const MAX_SUFFIX = 'cheat.cc'; // lowercase 'c' per spec
     suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
-    suffixLane.style.setProperty('--suffixWidth', suffixLane.style.minWidth);
-    // Precision bias calculation with anti-clip clamp
-    function recalcBias(){
-      const S_short = measure('ify');
-      const S_long = measure('cheat.cc');
-      const titleElForSize = document.querySelector('.title');
-      const titleFontSize = parseFloat(getComputedStyle(titleElForSize).fontSize)||98;
-      const k = Math.max(3, Math.min(8, Math.floor(0.03 * titleFontSize)));
-      let biasX = (S_short - S_long)/4 + k;
-      const container = document.getElementById('container');
-      if (container && titleRow){
-        const contRect = container.getBoundingClientRect();
-        const rowRect = titleRow.getBoundingClientRect();
-        const minLeft = contRect.left + 24;
-        const newLeft = rowRect.left + biasX;
-        if (newLeft < minLeft){ biasX += (minLeft - newLeft); }
-      }
-      if (titleRow){ titleRow.style.setProperty('--titleBias', biasX.toFixed(2)+'px'); }
-    }
-    recalcBias();
-    addEventListener('resize', recalcBias);
-    // tweak after fonts/animation settle
-    setTimeout(recalcBias, 700);
-    document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) recalcBias(); });
 
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    // Hidden measurer for per-prefix width without reflowing main layout
-    const measurer = document.createElement('span');
-    measurer.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;top:-9999px;';
-    measurer.className = 'suffixText';
-    document.body.appendChild(measurer);
-    function measurePrefixWidth(text){ measurer.textContent = text; return measurer.getBoundingClientRect().width; }
-    function positionCaret(){ const w = measurePrefixWidth(suffix.textContent); const px = (window.devicePixelRatio? Math.round((w+6)*window.devicePixelRatio)/window.devicePixelRatio : (w+6)); caret.style.transform = 'translateX(' + px + 'px)'; }
+    function positionCaret(){
+      const w = suffix.offsetWidth || 0;
+      caret.style.left = (w + 6) + 'px';
+    }
 
-    // Precompute advance arrays for cached caret positions
-    function measureWidth(text){ measurer.textContent = text; return measurer.getBoundingClientRect().width; }
-    function computeAdvances(text){
-      const advances = [0];
-      for (let i=1;i<=text.length;i++) advances[i] = measureWidth(text.slice(0,i));
-      return advances;
-    }
-    const advancesCheat = computeAdvances('cheat.cc');
-    const advancesIfy = computeAdvances('ify');
-    function toDevicePx(x){ const dpr = window.devicePixelRatio||1; return Math.round(x*dpr)/dpr; }
-    function setCaretFor(_text, _i){
-      const adv = measurePrefixWidth(suffix.textContent);
-      const px = toDevicePx(adv + 6);
-      caret.style.transform = 'translateX(' + px + 'px)';
-    }
-    function makeStepperWithCache(forward){
-      return (text, cps)=> new Promise(resolve=>{
-        let acc = 0; let i = forward ? 0 : suffix.textContent.length;
-        function tick(now){
-          const prev = tick.prev || now; const dt = Math.min(0.05, (now - prev)/1000); tick.prev = now;
-          acc += cps * dt;
-          if (acc >= 1){
-            acc -= 1;
-            if (forward){ if (i < text.length){ i++; suffix.textContent = text.slice(0, i); } }
-            else { if (i > 0){ i--; const next = suffix.textContent.slice(0, i); suffix.textContent = next || '\u00A0'; } }
-            setCaretFor(text, i);
-            // disable blink during motion
-            caret.classList.remove('blink');
+    async function type(text, cps){ // RAF/time-based stepper
+      const start = performance.now(); let i = 0;
+      return new Promise(resolve=>{
+        function tick(){
+          const elapsed = (performance.now()-start)/1000;
+          const target = Math.floor(elapsed*cps);
+          const next = Math.min(target, text.length);
+          if (next > i){
+            i = next;
+            suffix.textContent = text.slice(0,i);
+            positionCaret();
+            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
           }
-          const done = forward ? (i>=text.length) : (i<=0);
-          if (done){ resolve(); return; }
+          if (i >= text.length){ resolve(); return; }
           requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
       });
     }
-    const type = makeStepperWithCache(true);
-    const eraseToZero = (word, cps)=> makeStepperWithCache(false)(word, cps);
+    async function erase(toLen, cps){
+      const start = performance.now(); const fromLen = suffix.textContent.length;
+      return new Promise(resolve=>{
+        function tick(){
+          const elapsed = (performance.now()-start)/1000;
+          const target = Math.floor(elapsed*cps);
+          const next = Math.max(fromLen - target, toLen);
+          if (suffix.textContent.length !== next){
+            suffix.textContent = suffix.textContent.slice(0, next);
+            positionCaret();
+            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          }
+          if (next <= toLen){ resolve(); return; }
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
 
     let firstCycleDone = false;
     async function loop(){
       while(true){
-        caret.classList.remove('blink');
-        suffix.textContent = '\u00A0';
+        suffix.textContent = '';
         positionCaret();
-        let currentWord = 'cheat.cc';
-        await type(currentWord, 4);
-        caret.classList.add('blink');
-        await sleep(1400 + Math.random()*200);
-        await eraseToZero(currentWord, 4);
-        if (!prefersReduced){ caret.style.opacity='0'; await sleep(220 + Math.random()*80); caret.style.opacity=''; }
-        currentWord = 'ify';
-        await type(currentWord, 3);
-        caret.classList.add('blink');
-        await sleep(2600 + Math.random()*400);
-        await eraseToZero(currentWord, 3);
-        caret.classList.add('blink');
+        await type('cheat.cc', 7);
+        await sleep(900);
+        await erase(0, 7);
+        if (!prefersReduced){ caret.style.opacity='0'; await sleep(240); caret.style.opacity=''; }
+        await type('ify', 4);
+        await sleep(1800);
+        await erase(0, 9);
         await sleep(500);
         if (!firstCycleDone){
           firstCycleDone = true;
           if (titleEl && titleEl.getAttribute('aria-live')){
             titleEl.removeAttribute('aria-live');
           }
-          // re-evaluate bias after first cycle fully completes
-          try { recalcBias(); } catch {}
         }
       }
     }
