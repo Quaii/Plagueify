@@ -78,14 +78,15 @@
 
   /* Suffix lane: fixed width = width of longest word so centering doesn't shift */
   .suffixLane{
-    position:relative; display:inline-block; vertical-align:baseline;
+    position:relative; display:inline-flex; align-items:baseline; vertical-align:baseline;
     min-width:10px; /* measured & set at runtime */
-    height:1em; /* ensure stable line-box */
+    height:1em; line-height:1; /* ensure stable line-box */
   }
-  .suffixText{ color:#fff; letter-spacing:0; display:block; position:absolute; left:0; top:0; white-space:nowrap; }
+  .suffixText{ color:#fff; letter-spacing:0; display:block; position:absolute; left:0; top:0; white-space:nowrap; line-height:1; }
   .caret{
     position:absolute; left:0; top:0; display:block; width:0.055em; height:0.95em; background:#fff;
     /* margin handled via JS positioning to hug text */
+    will-change:transform, opacity;
   }
   @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.18}}
   .blink{animation:blink 950ms step-end infinite}
@@ -135,12 +136,12 @@
     position:fixed; left:50%; top:50%;
     width:10px; height:10px; border-radius:50%; pointer-events:none;
     z-index:9999; /* always above */
-    background:transparent; border:none;
+    background:transparent; border:none; mix-blend-mode:screen;
     box-shadow:
-      0 0 8px rgba(90,140,255,.55),
-      0 0 16px rgba(90,140,255,.35),
-      0 0 28px rgba(90,140,255,.28),
-      inset 0 0 10px rgba(255,255,255,.28);
+      0 0 12px rgba(90,140,255,.50),
+      0 0 24px rgba(90,140,255,.28),
+      0 0 48px rgba(90,140,255,.18),
+      0 0 80px rgba(90,140,255,.12);
     transform:translate(-50%,-50%);
   }
 
@@ -422,7 +423,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const isCoarse = matchMedia('(pointer: coarse)').matches;
     if (prefersReduced || isCoarse){ ring.style.display='none'; return; }
     let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
-    let scale = 1, targetScale = 1;
     let throttleFlip = false;
     const heavy = (innerWidth*innerHeight*(window.devicePixelRatio||1)) > 5_000_000;
     function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
@@ -437,13 +437,11 @@ window.addEventListener('DOMContentLoaded', () => {
       if (heavy){ throttleFlip = !throttleFlip; if (throttleFlip){ requestAnimationFrame(tick); return; } }
       rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
       const overInteractive = isInteractiveAt(tx,ty);
-      targetScale = overInteractive ? 1.12 : 1.0;
-      scale += (targetScale - scale) * 0.2;
       ring.style.left = rx+'px'; ring.style.top = ry+'px';
-      ring.style.transform = 'translate(-50%,-50%) scale(' + scale.toFixed(3) + ')';
+      ring.style.transform = 'translate(-50%,-50%)';
       ring.style.boxShadow = overInteractive
-        ? '0 0 28px rgba(90,140,255,.45), inset 0 0 30px rgba(90,140,255,.36)'
-        : '0 0 24px rgba(90,140,255,.38), inset 0 0 26px rgba(90,140,255,.3)';
+        ? '0 0 16px rgba(90,140,255,.60), 0 0 32px rgba(90,140,255,.40), 0 0 64px rgba(90,140,255,.22), 0 0 96px rgba(90,140,255,.16)'
+        : '0 0 12px rgba(90,140,255,.50), 0 0 24px rgba(90,140,255,.28), 0 0 48px rgba(90,140,255,.18), 0 0 80px rgba(90,140,255,.12)';
       requestAnimationFrame(tick);
     })();
   })();
@@ -480,48 +478,40 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    function positionCaret(){
-      const w = suffix.offsetWidth || 0;
-      caret.style.left = (w + 6) + 'px';
-    }
+    // Hidden measurer for per-prefix width without reflowing main layout
+    const measurer = document.createElement('span');
+    measurer.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;left:-9999px;top:-9999px;';
+    measurer.className = 'suffixText';
+    document.body.appendChild(measurer);
+    function measurePrefixWidth(text){ measurer.textContent = text; return measurer.getBoundingClientRect().width; }
+    function positionCaret(){ const w = measurePrefixWidth(suffix.textContent); caret.style.transform = 'translateX(' + (w + 6).toFixed(2) + 'px)'; }
 
-    async function type(text, cps){ // RAF/time-based stepper
-      const start = performance.now(); let i = 0;
-      return new Promise(resolve=>{
-        function tick(){
-          const elapsed = (performance.now()-start)/1000;
-          const target = Math.floor(elapsed*cps);
-          const next = Math.min(target, text.length);
-          if (next > i){
-            i = next;
-            suffix.textContent = text.slice(0,i);
+    function makeStepper(forward){
+      return (text, cps)=> new Promise(resolve=>{
+        let acc = 0; let i = forward ? 0 : suffix.textContent.length;
+        function tick(now){
+          const prev = tick.prev || now; const dt = Math.min(0.05, (now - prev)/1000); tick.prev = now;
+          acc += cps * dt;
+          if (acc >= 1){
+            acc -= 1;
+            if (forward){
+              if (i < text.length){ i++; suffix.textContent = text.slice(0, i); }
+            } else {
+              if (i > 0){ i--; suffix.textContent = suffix.textContent.slice(0, i); }
+            }
             positionCaret();
-            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+            caret.style.opacity = '0.9';
+            setTimeout(()=>{ caret.style.opacity=''; }, 60);
           }
-          if (i >= text.length){ resolve(); return; }
+          const done = forward ? (i>=text.length) : (i<=0);
+          if (done){ resolve(); return; }
           requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
       });
     }
-    async function erase(toLen, cps){ // RAF/time-based erase
-      const start = performance.now(); const fromLen = suffix.textContent.length;
-      return new Promise(resolve=>{
-        function tick(){
-          const elapsed = (performance.now()-start)/1000;
-          const target = Math.floor(elapsed*cps);
-          const next = Math.max(fromLen - target, toLen);
-          if (suffix.textContent.length !== next){
-            suffix.textContent = suffix.textContent.slice(0, next);
-            positionCaret();
-            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-          }
-          if (next <= toLen){ resolve(); return; }
-          requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-      });
-    }
+    const type = makeStepper(true);
+    const eraseToZero = (cps)=> makeStepper(false)('', cps);
 
     let firstCycleDone = false;
     async function loop(){
@@ -530,11 +520,11 @@ window.addEventListener('DOMContentLoaded', () => {
         positionCaret();
         await type('cheat.cc', 4);
         await sleep(1400 + Math.random()*200);
-        await erase(0, 4);
+        await eraseToZero(4);
         if (!prefersReduced){ caret.style.opacity='0'; await sleep(220 + Math.random()*80); caret.style.opacity=''; }
         await type('ify', 3);
         await sleep(2600 + Math.random()*400);
-        await erase(0, 3);
+        await eraseToZero(3);
         await sleep(500);
         if (!firstCycleDone){
           firstCycleDone = true;
