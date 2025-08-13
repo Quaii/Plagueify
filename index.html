@@ -21,36 +21,8 @@
     overflow:hidden; cursor:none; /* we draw our own */
   }
 
-  /* Frosted-glass + particle canvas (never intercepts clicks) */
+  /* Frosted-glass + raindrops canvas (never intercepts clicks) */
   #bg{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none;}
-
-  /* Fixed decorative overlays stacked above canvas, below stage */
-  .fxLayer{position:fixed; inset:0; z-index:0; pointer-events:none}
-  /* Disable lighting overlays to remove background glow/“shaved” look */
-  .gridLayer, .bloomLayer { display: none !important; }
-  .gridLayer{
-    opacity:.10;
-    mix-blend-mode:overlay;
-    background-image:
-      repeating-linear-gradient(0deg, rgba(100,150,255,.12), rgba(100,150,255,.12) 1px, transparent 1px, transparent 24px),
-      repeating-linear-gradient(90deg, rgba(100,150,255,.12), rgba(100,150,255,.12) 1px, transparent 1px, transparent 24px);
-  }
-  .bloomLayer{
-    opacity:.22;
-    mix-blend-mode:screen;
-    filter:blur(44px);
-    background:
-      radial-gradient(40% 40% at 28% 32%, rgba(109,165,255,.28), rgba(109,165,255,0) 60%),
-      radial-gradient(46% 46% at 72% 68%, rgba(58,109,245,.22), rgba(58,109,245,0) 62%),
-      radial-gradient(30% 30% at 50% 50%, rgba(74,130,255,.18), rgba(74,130,255,0) 65%);
-  }
-  .grainLayer{
-    opacity:.1;
-    mix-blend-mode:soft-light;
-    background-image: radial-gradient(rgba(255,255,255,.12) 0.5px, transparent 0.6px);
-    background-size: 3px 3px;
-    background-position: 0 0;
-  }
 
   .stage{position:relative; z-index:1; height:100%; display:grid; place-items:center; padding:24px; overflow:visible;}
   .container{width:min(820px,92vw); opacity:0; transform:translateY(8px) scale(.985)}
@@ -62,18 +34,27 @@
     font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
     font-weight:800; letter-spacing:.2px;
     font-size:clamp(48px,10vw,98px);
-    line-height:1.05; user-select:none; text-align:center;
+    line-height:.95; user-select:none; text-align:center;
     margin:0 0 36px 0; white-space:nowrap; overflow:visible;
-    text-shadow:0 0 10px rgba(90,140,255,.18);
-    overflow:visible;
+    text-shadow:0 0 10px rgba(90,140,255,.18); /* glow, not bloom */
   }
   .titleRow{display:inline-flex; align-items:baseline; gap:0; overflow:visible;}
-  .blueGrad{display:inline-block; padding-bottom:.08em;background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);-webkit-background-clip:text; background-clip:text; color:transparent;filter:drop-shadow(0 0 8px rgba(90,140,255,.18));}
+  .blueGrad{
+    background:linear-gradient(180deg,var(--blue1) 0%,var(--blue3) 50%,var(--blue2) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 8px rgba(90,140,255,.18));
+  }
 
-  /* Suffix lane — removed left margin so it's tight after the "E" */
-  .suffixLane{ position:relative; display:inline-block; vertical-align:baseline; min-width:10px; margin-left:0; }
-  .suffixText{ color:#fff; letter-spacing:0; display:inline-block; position:relative; white-space:nowrap; }
-  .caret{ position:absolute; left:0; top:0; display:block; width:0.055em; height:0.9em; background:#fff; }
+  /* Suffix lane: fixed width = width of longest word so centering doesn't shift */
+  .suffixLane{
+    position:relative; display:inline-block; vertical-align:baseline;
+    min-width:10px; /* measured & set at runtime */
+  }
+  .suffixText{ color:#fff; letter-spacing:0; display:inline; }
+  .caret{
+    display:inline-block; width:0.055em; height:0.95em; background:#fff;
+    margin-left:6px; vertical-align:-0.05em;
+  }
   @keyframes blink{0%,45%{opacity:1}55%,100%{opacity:.18}}
   .blink{animation:blink 950ms step-end infinite}
   @keyframes jiggle{0%{transform:translateY(0)}50%{transform:translateY(-1px)}100%{transform:translateY(0)}}
@@ -94,58 +75,86 @@
   .controls{text-align:center; margin-top:16px}
   .btn{
     appearance:none; border:1px solid var(--line); background:#1a1c21; color:var(--ink);
-    padding:12px 18px; border-radius:0; font-weight:700; letter-spacing:.2px;
+    padding:12px 18px; border-radius:0; font-weight:700; letter-spacing:.2px; cursor:pointer;
     transition:transform .12s, border-color .2s, box-shadow .2s, background .2s;
     box-shadow:0 12px 28px rgba(0,0,0,.28);
   }
   .btn:hover{ transform:translateY(-1px); border-color:#3a4050; background:#1f2228; box-shadow:0 16px 34px rgba(0,0,0,.36) }
   .hero{display:flex; flex-direction:column; align-items:center; gap:28px}
-  .btn-cta{ padding:14px 22px; margin-top:-10px; } /* move CTA up by 10px */
-
-  /* Focus visibility for keyboard users */
-  .btn:focus-visible{
-    outline:2px solid #4a82ff; outline-offset:2px; border-color:#4a82ff;
-    box-shadow:0 0 0 4px rgba(74,130,255,.22), 0 12px 28px rgba(0,0,0,.28);
-  }
-  .token:focus-visible{
-    outline:2px solid #4a82ff; outline-offset:2px; border-color:#3c68ff;
-  }
-  /* Ensure OS cursor never shows on interactives */
-  a, button, [role="button"], input, textarea, select, .btn, .token { cursor:none; }
+  .btn-cta{ padding:14px 22px }
 
   .hide{display:none !important}
   .muted{opacity:.72; font-size:.95rem; text-align:center; margin-top:10px}
   .ok{color:#9ae6a0} .err{color:#ff8c8c}
 
-  /* Custom cursor — stronger glow ring + glow dot */
-  .cursorRing{position:fixed; left:50%; top:50%; width:10px; height:10px; border-radius:50%; pointer-events:none; z-index:9999; border:none; background:transparent; box-shadow:0 0 30px rgba(90,140,255,0.85), 0 0 60px rgba(90,140,255,0.75), 0 0 90px rgba(90,140,255,0.65), 0 0 120px rgba(90,140,255,0.5); transform:translate(-50%,-50%);}
-  .cursorDot{position:fixed; left:50%; top:50%; width:6px; height:6px; border-radius:50%; pointer-events:none; z-index:9999; background:rgba(200,215,255,1); box-shadow:0 0 20px rgba(90,140,255,1), 0 0 40px rgba(90,140,255,0.85), 0 0 80px rgba(90,140,255,0.7); transform:translate(-50%,-50%);}
-
-  /* Respect reduced motion: hide overlays + custom cursor */
-  @media (prefers-reduced-motion: reduce){
-    .gridLayer, .bloomLayer, .grainLayer{display:none !important}
-    .blink{animation:none}
-    .cursorRing, .cursorDot{display:none !important}
+  /* Custom cursor — glow ring only */
+  .cursorRing{
+    position:fixed; left:50%; top:50%;
+    width:42px; height:42px; border-radius:50%; pointer-events:none;
+    z-index:9999; /* always above */
+    border:1px solid rgba(120,165,255,.55);
+    box-shadow:
+      0 0 20px rgba(90,140,255,.35),
+      inset 0 0 22px rgba(90,140,255,.25);
+    transform:translate(-50%,-50%);
   }
 
-  /* Hide cursor on coarse pointers (touch devices) */
-  @media (pointer: coarse){
-    .cursorRing, .cursorDot{display:none !important}
+  /* Sound toggle (no icon, no native cursor) */
+  .mute{
+    position:fixed; right:14px; bottom:14px; z-index:100;
+    background:#121317e6; color:#cfd7ff; border:1px solid #2b2f36;
+    padding:8px 12px; font-size:.85rem; letter-spacing:.2px;
+    box-shadow:0 8px 22px rgba(0,0,0,.35);
+    cursor:none; /* keep native cursor hidden even over the button */
   }
+  .mute:hover{ background:#161922 }
+
+  /* Vertical volume bar (sharp corners like buttons) */
+  .volume{
+    position:fixed; right:14px; bottom:70px; z-index:100;
+    width:18px; height:160px; user-select:none;
+  }
+  .volTrack{
+    position:relative; width:100%; height:100%;
+    background:#1a1c21; border:1px solid var(--line);
+    box-shadow:0 8px 22px rgba(0,0,0,.35);
+  }
+  .volFill{
+    position:absolute; left:0; bottom:0; width:100%; height:0%;
+    background:#cfd7ff; /* match play text color */
+  }
+  .volume:focus-within .volTrack, .volume:hover .volTrack{ border-color:#3a4050; background:#1f2228 }
 </style>
+  <!-- Preload key sounds for faster first-play -->
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/BACKSPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/ENTER.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/SPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R0.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R1.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R2.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R3.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/GENERIC_R4.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/BACKSPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/ENTER.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/SPACE.mp3">
+  <link rel="preload" as="audio" href="resources/sounds/holy-pandas/release/GENERIC.mp3">
 </head>
 <body>
-  <!-- Particle canvas -->
+  <!-- Frosted glass + raindrops -->
   <canvas id="bg" aria-hidden="true"></canvas>
-
-  <!-- Decorative layers -->
-  <div class="fxLayer gridLayer" aria-hidden="true"></div>
-  <div class="fxLayer bloomLayer" aria-hidden="true"></div>
-  <div class="fxLayer grainLayer" aria-hidden="true"></div>
 
   <!-- Custom glow cursor -->
   <div class="cursorRing" id="ring"></div>
-  <div class="cursorDot" id="dot"></div>
+
+  <!-- Typing sound toggle -->
+  <button id="mute" class="mute" aria-pressed="true" title="Toggle typing sound (default on)">Typing sound: on</button>
+
+  <!-- Vertical volume control -->
+  <div id="volume" class="volume" role="slider" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80" tabindex="0">
+    <div class="volTrack" id="volTrack">
+      <div class="volFill" id="volFill"></div>
+    </div>
+  </div>
 
   <div class="stage">
     <div class="container" id="container">
@@ -154,7 +163,8 @@
         <h1 class="title" aria-live="polite">
           <span class="titleRow">
             <span class="blueGrad">Plague</span>
-            <span class="suffixLane"><span id="suffix" class="suffixText"></span><span id="caret" class="caret blink"></span></span>
+            <span class="suffixLane"><span id="suffix" class="suffixText"></span></span>
+            <span id="caret" class="caret blink"></span>
           </span>
         </h1>
         <button class="btn btn-cta" id="btn-login">Sign in to Spotify</button>
@@ -177,182 +187,68 @@
   </div>
 
 <script>
-
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('container').classList.add('in');
 
-  /* ================= Frosted glass + floating particles (no lightning) ================= */
+  /* ================= Frosted glass + glowing raindrops ================= */
   (function frosted(){
     const c = document.getElementById('bg');
     const ctx = c.getContext('2d');
-    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let w,h,dpr;
-    let dropsBack=[], dropsMid=[], dropsFront=[], heroOrbs=[];
-    let lastT = performance.now();
-    // Parallax tracking
-    let tpx = 0, tpy = 0, ppx = 0, ppy = 0;
-    function onPointer(e){
-      const p = e.touches? e.touches[0]: e;
-      const nx = (p.clientX / w) - 0.5;
-      const ny = (p.clientY / h) - 0.5;
-      tpx = nx; tpy = ny;
-    }
-    if (!prefersReduced){
-      addEventListener('pointermove', onPointer, {passive:true});
-      addEventListener('touchmove', onPointer, {passive:true});
-    }
+    let w,h,dpr, drops=[];
 
     function resize(){
       w = innerWidth; h = innerHeight; dpr = Math.min(2, devicePixelRatio||1);
       c.style.width = w+'px'; c.style.height = h+'px';
       c.width = (w*dpr)|0; c.height = (h*dpr)|0;
       ctx.setTransform(dpr,0,0,dpr,0,0);
-
-      // base population from area
-      const baseCount = Math.floor((w*h)/20000);
-
-      // double particle amounts (locked from previous change)
-      const backCount = Math.max(0, Math.floor(baseCount*0.40) * 2);
-      const midCount  = Math.max(0, Math.floor(baseCount*0.38) * 2);
-      const frontCount= Math.max(0, Math.floor(baseCount*0.22) * 2);
-      const heroCount = 0;
-
-      const MAX_TOTAL = 1400; // safety cap for ultra-wide
-      const total = backCount+midCount+frontCount+heroCount;
-      const scale = total>MAX_TOTAL ? MAX_TOTAL/total : 1;
-
-      function fill(count, kind){
-        return new Array(Math.floor(count*scale)).fill(0).map(()=>spawn(kind));
-      }
-      dropsBack = fill(backCount, 'back');
-      dropsMid  = fill(midCount,  'mid');
-      dropsFront= fill(frontCount,'front');
-      heroOrbs  = fill(heroCount, 'hero');
+      // rebuild drops
+      const count = Math.floor((w*h)/38000); // scale with screen
+      drops = new Array(count).fill(0).map(()=>spawn());
     }
-
-    function spawn(kind){
-      const layer = kind;
-      // slightly larger particle radii everywhere (~+20%)
-      let r, vy, sway, alpha;
-      if (layer==='back'){
-        r = (0.6 + Math.random()*0.8) * 1.2;
-        vy = 0.6 + Math.random()*1.1;
-        sway = (Math.random()-.5)*0.28;
-        alpha = 0.14 + Math.random()*0.18;
-      } else if (layer==='mid'){
-        r = (0.8 + Math.random()*1.2) * 1.2;
-        vy = 0.3 + Math.random()*0.8;
-        sway = (Math.random()-.5)*0.25;
-        alpha = 0.14 + Math.random()*0.22;
-      } else if (layer==='front'){
-        r = (1.2 + Math.random()*1.4) * 1.2;
-        vy = 0.18 + Math.random()*0.45;
-        sway = (Math.random()-.5)*0.22;
-        alpha = 0.12 + Math.random()*0.18;
-      } else { // hero (unused)
-        r = (6 + Math.random()*10) * 1.2;
-        vy = 0.05 + Math.random()*0.12;
-        sway = (Math.random()-.5)*0.18;
-        alpha = 0.10 + Math.random()*0.14;
-      }
-      const twinkle = false; // disable flash to remove any "lightning" feel
+    function spawn(){
+      const r = 1 + Math.random()*2.2;
       return {
         x: Math.random()*w, y: Math.random()*h,
-        r, vy, sway,
-        hue: 215 + Math.random()*18,
-        alpha,
-        twinkle,
-        twFreq: 0.6 + Math.random()*0.8,
-        twPhase: Math.random()*Math.PI*2,
-        layer
+        r, vy: 0.3 + Math.random()*0.8, sway: (Math.random()-.5)*0.25,
+        hue: 215 + Math.random()*18, alpha: 0.18 + Math.random()*0.25
       };
     }
-
     function drawGlass(){
-      ctx.fillStyle = '#0b0b0c';
+      // soft frosted plate in center
+      const g = ctx.createRadialGradient(w*0.5, h*0.45, Math.min(w,h)*0.1, w*0.5, h*0.45, Math.min(w,h)*0.6);
+      g.addColorStop(0, '#0f141f');
+      g.addColorStop(1, '#0b0b0c');
+      ctx.fillStyle = g;
       ctx.fillRect(0,0,w,h);
     }
-
-    function stepAndDrawSet(set, t){
-      for (const d of set){
+    function draw(){
+      drawGlass();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const d of drops){
         d.y += d.vy; d.x += d.sway;
         if (d.y - d.r > h+10) { d.y = -10; d.x = Math.random()*w; }
-        const a = d.alpha; // no twinkle
-        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${a})`;
-        ctx.fillStyle   = `hsla(${d.hue}, 80%, 60%, ${a*0.65})`;
-        ctx.shadowBlur = d.layer==='front' ? 12 : (d.layer==='mid' ? 9 : 7);
+        ctx.shadowColor = `hsla(${d.hue}, 80%, 60%, ${d.alpha})`;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = `hsla(${d.hue}, 80%, 60%, ${d.alpha*0.65})`;
         ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
       }
-    }
-
-    function draw(now){
-      const dt = Math.min(100, now - lastT); // clamp
-      lastT = now;
-      const t = now/1000;
-      // Ease parallax
-      ppx += (tpx - ppx) * 0.06;
-      ppy += (tpy - ppy) * 0.06;
-      drawGlass();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.save(); ctx.translate(ppx*12, ppy*12); stepAndDrawSet(dropsBack, t); ctx.restore();
-      ctx.save(); ctx.translate(ppx*8,  ppy*8 ); stepAndDrawSet(dropsMid,  t); ctx.restore();
-      ctx.save(); ctx.translate(ppx*5,  ppy*5 ); stepAndDrawSet(dropsFront,t); ctx.restore();
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
-      if (!prefersReduced) requestAnimationFrame(draw);
-    }
-
-    resize(); addEventListener('resize', resize);
-    if (prefersReduced){
-      drawGlass();
-    } else {
       requestAnimationFrame(draw);
     }
+    resize(); addEventListener('resize', resize); draw();
   })();
 
-  /* ================= Precise glow cursor — ring + dot ================= */
-  (function cursorGlow(){
+  /* ================= Precise glow cursor (ring only) ================= */
+  (function cursorRing(){
     const ring = document.getElementById('ring');
-    const dot  = document.getElementById('dot');
-    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const isCoarse = matchMedia('(pointer: coarse)').matches;
-    if (prefersReduced || isCoarse){ ring.style.display='none'; dot.style.display='none'; return; }
-
     let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
-    let scale = 1, targetScale = 1;
-    let throttleFlip = false;
-    const heavy = (innerWidth*innerHeight*(window.devicePixelRatio||1)) > 5_000_000;
-
     function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
     addEventListener('pointermove', move, {passive:true});
-
-    function isInteractiveAt(x,y){
-      const el = document.elementFromPoint(x,y);
-      if (!el) return false;
-      const sel = 'button, a, [role="button"], input, textarea, select, .btn';
-      return el.closest(sel) != null;
-    }
-
+    addEventListener('touchmove', move, {passive:true});
     (function tick(){
-      if (heavy){ throttleFlip = !throttleFlip; if (throttleFlip){ requestAnimationFrame(tick); return; } }
       rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
-      const overInteractive = isInteractiveAt(tx,ty);
-      targetScale = overInteractive ? 1.12 : 1.0;
-      scale += (targetScale - scale) * 0.2;
-
-      const x = rx+'px', y = ry+'px', t = 'translate(-50%,-50%) scale(' + scale.toFixed(3) + ')';
-      ring.style.left = x; ring.style.top = y; ring.style.transform = t;
-      dot.style.left  = x; dot.style.top  = y; dot.style.transform  = t;
-
-      /* Stronger glow on hover and idle */
-      ring.style.boxShadow = overInteractive
-        ? '0 0 40px rgba(90,140,255,0.95), 0 0 80px rgba(90,140,255,0.85), 0 0 120px rgba(90,140,255,0.7)'
-        : '0 0 30px rgba(90,140,255,0.85), 0 0 60px rgba(90,140,255,0.75), 0 0 90px rgba(90,140,255,0.65)';
-
-      dot.style.boxShadow = overInteractive
-        ? '0 0 25px rgba(90,140,255,1), 0 0 50px rgba(90,140,255,0.9), 0 0 100px rgba(90,140,255,0.8)'
-        : '0 0 20px rgba(90,140,255,1), 0 0 40px rgba(90,140,255,0.85), 0 0 80px rgba(90,140,255,0.7)';
-
+      ring.style.left = rx+'px'; ring.style.top = ry+'px';
       requestAnimationFrame(tick);
     })();
   })();
@@ -362,8 +258,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const suffixLane = document.querySelector('.suffixLane');
     const suffix = document.getElementById('suffix');
     const caret = document.getElementById('caret');
-    const titleEl = document.querySelector('h1.title');
-    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const muteBtn = document.getElementById('mute');
+    const volEl = document.getElementById('volume');
+    const volTrack = document.getElementById('volTrack');
+    const volFill = document.getElementById('volFill');
 
     // Measure max width using an offscreen span so center stays steady
     const measure = (text)=>{
@@ -379,70 +277,222 @@ window.addEventListener('DOMContentLoaded', () => {
     const MAX_SUFFIX = 'cheat.cc'; // lowercase 'c' per spec
     suffixLane.style.minWidth = Math.ceil(measure(MAX_SUFFIX)) + 'px';
 
+    // sound (sample-based using holy-pandas set)
+    let audioCtx = null, masterGain = null, muted = true;
+    let audioReady = false;
+    const soundQueue = [];
+    const audioEls = new Map(); // HTMLAudio fallback per key
+    const setMuted = m => { muted = m; muteBtn.textContent = 'Typing sound: ' + (muted ? 'off' : 'on'); muteBtn.setAttribute('aria-pressed', String(!muted)); };
+    setMuted(false);
+
+    // Volume state (0..1), persisted
+    const stored = parseFloat(localStorage.getItem('volume01'));
+    let volume01 = Number.isFinite(stored) ? Math.min(1, Math.max(0, stored)) : 1;
+    function applyVolumeUI(){
+      const v = Number.isFinite(volume01) ? Math.min(1, Math.max(0, volume01)) : 1;
+      const percent = Math.round(v * 100);
+      volFill.style.height = percent + '%';
+      volEl.setAttribute('aria-valuenow', String(percent));
+      if (masterGain) masterGain.gain.value = v;
+    }
+    applyVolumeUI();
+
+    const basePath = 'resources/sounds/holy-pandas/';
+    const soundPaths = {
+      'SPACE': basePath + 'SPACE.mp3',
+      'BACKSPACE': basePath + 'BACKSPACE.mp3',
+      'ENTER': basePath + 'ENTER.mp3',
+      'GENERIC_R0': basePath + 'GENERIC_R0.mp3',
+      'GENERIC_R1': basePath + 'GENERIC_R1.mp3',
+      'GENERIC_R2': basePath + 'GENERIC_R2.mp3',
+      'GENERIC_R3': basePath + 'GENERIC_R3.mp3',
+      'GENERIC_R4': basePath + 'GENERIC_R4.mp3',
+      'release/SPACE': basePath + 'release/SPACE.mp3',
+      'release/BACKSPACE': basePath + 'release/BACKSPACE.mp3',
+      'release/ENTER': basePath + 'release/ENTER.mp3',
+      'release/GENERIC': basePath + 'release/GENERIC.mp3'
+    };
+    const buffers = new Map();
+    let buffersLoaded = false, buffersLoadingPromise = null;
+
+    async function ensureAudio(){
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = volume01; // align with UI
+        masterGain.connect(audioCtx.destination);
+      }
+      // Try to resume (required on some browsers even after a gesture)
+      try { await audioCtx.resume(); } catch {}
+      if (buffersLoaded) return;
+      if (!buffersLoadingPromise) {
+        const entries = Object.entries(soundPaths);
+        buffersLoadingPromise = Promise.all(entries.map(async ([key, url]) => {
+          try {
+            const res = await fetch(url);
+            const arr = await res.arrayBuffer();
+            const buf = await audioCtx.decodeAudioData(arr);
+            buffers.set(key, buf);
+          } catch (e) {
+            console.warn('Audio decode failed for', key, 'at', url, e);
+            // Prepare HTMLAudio fallback
+            try{
+              const a = new Audio(url);
+              a.preload = 'auto';
+              audioEls.set(key, a);
+            }catch{}
+          }
+        })).then(() => { buffersLoaded = true; });
+      }
+      await buffersLoadingPromise;
+    }
+
+    function playBuffer(name, volume = 0.9){
+      if (muted || !audioCtx) return;
+      const buf = buffers.get(name);
+      if (buf){
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const g = audioCtx.createGain();
+        g.gain.value = volume;
+        src.connect(g).connect(masterGain);
+        if (audioCtx.state !== 'running') { try { audioCtx.resume(); } catch {} }
+        try { src.start(); } catch {}
+      } else {
+        // Fallback via HTMLAudio; clone for overlap
+        const el = audioEls.get(name) || audioEls.get('release/GENERIC');
+        if (!el) return;
+        const clone = el.cloneNode(true);
+        clone.volume = Math.max(0, Math.min(1, volume01 * volume));
+        clone.play().catch(()=>{});
+      }
+    }
+
+    function scheduleRelease(name){
+      const delayMs = 85 + Math.random()*40; // slight variability
+      setTimeout(() => playBuffer(name, 0.8), delayMs);
+    }
+
+    function playCharSound(ch){
+      const play = () => {
+        if (ch === ' '){
+          playBuffer('SPACE');
+          scheduleRelease('release/SPACE');
+        } else {
+          const idx = (Math.random()*5)|0;
+          playBuffer('GENERIC_R'+idx);
+          scheduleRelease('release/GENERIC');
+        }
+      };
+      if (audioReady) play(); else soundQueue.push(play);
+    }
+
+    function playBackspaceSound(){
+      const play = () => { playBuffer('BACKSPACE'); scheduleRelease('release/BACKSPACE'); };
+      if (audioReady) play(); else soundQueue.push(play);
+    }
+
+    function testPing(){
+      // quick audible confirmation: generic press + release
+      const idx = (Math.random()*5)|0;
+      playBuffer('GENERIC_R'+idx, 1.0);
+      scheduleRelease('release/GENERIC');
+    }
+
+    muteBtn.addEventListener('click', async () => {
+      await ensureAudio();
+      const nowMuted = !muted;
+      setMuted(nowMuted);
+      if (!nowMuted) { testPing(); }
+    });
+
+    // One-time audio unlock based on real gestures
+    async function enableAudio(){
+      await ensureAudio();
+      try { await audioCtx.resume(); } catch {}
+      audioReady = !!(audioCtx && audioCtx.state === 'running');
+      if (audioReady) {
+        // flush queued sounds
+        soundQueue.splice(0).forEach(fn => { try { fn(); } catch {} });
+      }
+    }
+    ;['click','touchstart','keydown','wheel','scroll','pointerdown'].forEach(t =>
+      window.addEventListener(t, enableAudio, { passive:true, once:true })
+    );
+
+    // Volume interactions
+    function setVolumeFromClientY(clientY){
+      const rect = volTrack.getBoundingClientRect();
+      const ratio = 1 - ((clientY - rect.top) / rect.height);
+      volume01 = Math.min(1, Math.max(0, ratio));
+      localStorage.setItem('volume01', String(volume01));
+      if (masterGain) masterGain.gain.value = volume01;
+      applyVolumeUI();
+    }
+    function startVolDrag(e){ e.preventDefault(); ensureAudio().then(()=>testPing()); dragging=true; const p=e.touches?e.touches[0]:e; setVolumeFromClientY(p.clientY); }
+    function moveVolDrag(e){ if(!dragging) return; const p=e.touches?e.touches[0]:e; setVolumeFromClientY(p.clientY); }
+    function endVolDrag(){ dragging=false; }
+    let dragging=false;
+    volTrack.addEventListener('pointerdown', startVolDrag);
+    window.addEventListener('pointermove', moveVolDrag);
+    window.addEventListener('pointerup', endVolDrag);
+    // Touch fallback
+    volTrack.addEventListener('touchstart', startVolDrag, {passive:false});
+    window.addEventListener('touchmove', moveVolDrag, {passive:false});
+    window.addEventListener('touchend', endVolDrag);
+    // Keyboard accessibility
+    volEl.addEventListener('keydown', (e)=>{
+      let delta = 0;
+      if (e.key === 'ArrowUp') delta = 0.05;
+      else if (e.key === 'ArrowDown') delta = -0.05;
+      else if (e.key === 'Home') { volume01 = 0; delta = 0; }
+      else if (e.key === 'End') { volume01 = 1; delta = 0; }
+      if (delta !== 0 || e.key === 'Home' || e.key === 'End'){
+        e.preventDefault(); ensureAudio();
+        if (delta !== 0) volume01 = Math.min(1, Math.max(0, volume01 + delta));
+        localStorage.setItem('volume01', String(volume01));
+        if (masterGain) masterGain.gain.value = volume01;
+        applyVolumeUI();
+      }
+    });
+
     const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-    function positionCaret(){
-      const w = suffix.offsetWidth || 0;
-      caret.style.left = (w + 6) + 'px';
-    }
-
-    async function type(text, cps){ // RAF/time-based stepper
+    async function type(text, cps){ // time-based, but play a sound per character
       const start = performance.now(); let i = 0;
-      return new Promise(resolve=>{
-        function tick(){
-          const elapsed = (performance.now()-start)/1000;
-          const target = Math.floor(elapsed*cps);
-          const next = Math.min(target, text.length);
-          if (next > i){
-            i = next;
-            suffix.textContent = text.slice(0,i);
-            positionCaret();
-            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-          }
-          if (i >= text.length){ resolve(); return; }
-          requestAnimationFrame(tick);
+      while (i < text.length){
+        const elapsed = (performance.now()-start)/1000;
+        const target = Math.floor(elapsed*cps);
+        const next = Math.min(target, text.length);
+        while (i < next){
+          const ch = text[i];
+          i++;
+          suffix.textContent = text.slice(0,i);
+          caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+          playCharSound(ch);
         }
-        requestAnimationFrame(tick);
-      });
+        await new Promise(r=>requestAnimationFrame(r));
+      }
     }
-    async function erase(toLen, cps){
-      const start = performance.now(); const fromLen = suffix.textContent.length;
-      return new Promise(resolve=>{
-        function tick(){
-          const elapsed = (performance.now()-start)/1000;
-          const target = Math.floor(elapsed*cps);
-          const next = Math.max(fromLen - target, toLen);
-          if (suffix.textContent.length !== next){
-            suffix.textContent = suffix.textContent.slice(0, next);
-            positionCaret();
-            caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
-          }
-          if (next <= toLen){ resolve(); return; }
-          requestAnimationFrame(tick);
-        }
-        requestAnimationFrame(tick);
-      });
+    async function backspace(n, cps){
+      for (let i=0;i<n;i++){
+        suffix.textContent = suffix.textContent.slice(0,-1);
+        caret.style.animation='jiggle 120ms ease-out'; setTimeout(()=>caret.style.animation='',120);
+        playBackspaceSound();
+        await sleep(1000/cps);
+      }
     }
 
-    let firstCycleDone = false;
     async function loop(){
       while(true){
         suffix.textContent = '';
-        positionCaret();
-        await type('cheat.cc', 7);
+        await type('cheat.cc', 7);     // slower
         await sleep(900);
-        await erase(0, 7);
-        if (!prefersReduced){ caret.style.opacity='0'; await sleep(240); caret.style.opacity=''; }
-        await type('ify', 4);
+        await backspace('cheat.cc'.length, 7); // slow erase
+        await type('ify', 4);          // extra slow
         await sleep(1800);
-        await erase(0, 9);
+        await backspace('ify'.length, 9);
         await sleep(500);
-        if (!firstCycleDone){
-          firstCycleDone = true;
-          if (titleEl && titleEl.getAttribute('aria-live')){
-            titleEl.removeAttribute('aria-live');
-          }
-        }
       }
     }
     loop();
@@ -521,7 +571,7 @@ window.addEventListener('DOMContentLoaded', () => {
     statusB.classList.toggle("err", !ok);
   });
 });
-
 </script>
 </body>
 </html>
+
