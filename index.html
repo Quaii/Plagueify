@@ -18,7 +18,7 @@
   body{
     background:var(--bg); color:var(--ink);
     font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-    overflow:hidden; cursor:none; /* we draw our own */
+    overflow:hidden;
   }
 
   /* Frosted-glass + particle canvas (never intercepts clicks) */
@@ -110,27 +110,21 @@
   .token:focus-visible{
     outline:2px solid #4a82ff; outline-offset:2px; border-color:#3c68ff;
   }
-  /* Ensure OS cursor never shows on interactives */
-  a, button, [role="button"], input, textarea, select, .btn, .token { cursor:none; }
 
   .hide{display:none !important}
   .muted{opacity:.72; font-size:.95rem; text-align:center; margin-top:10px}
   .ok{color:#9ae6a0} .err{color:#ff8c8c}
 
-  /* Custom cursor — stronger glow ring + glow dot */
-  .cursorRing{position:fixed; left:50%; top:50%; width:10px; height:10px; border-radius:50%; pointer-events:none; z-index:9999; border:none; background:transparent; box-shadow:0 0 30px rgba(90,140,255,0.85), 0 0 60px rgba(90,140,255,0.75), 0 0 90px rgba(90,140,255,0.65), 0 0 120px rgba(90,140,255,0.5); transform:translate(-50%,-50%);}
-  .cursorDot{position:fixed; left:50%; top:50%; width:6px; height:6px; border-radius:50%; pointer-events:none; z-index:9999; background:rgba(200,215,255,1); box-shadow:0 0 20px rgba(90,140,255,1), 0 0 40px rgba(90,140,255,0.85), 0 0 80px rgba(90,140,255,0.7); transform:translate(-50%,-50%);}
+
 
   /* Respect reduced motion: hide overlays + custom cursor */
   @media (prefers-reduced-motion: reduce){
     .gridLayer, .bloomLayer, .grainLayer{display:none !important}
     .blink{animation:none}
-    .cursorRing, .cursorDot{display:none !important}
   }
 
   /* Hide cursor on coarse pointers (touch devices) */
   @media (pointer: coarse){
-    .cursorRing, .cursorDot{display:none !important}
   }
 </style>
 </head>
@@ -142,10 +136,6 @@
   <div class="fxLayer gridLayer" aria-hidden="true"></div>
   <div class="fxLayer bloomLayer" aria-hidden="true"></div>
   <div class="fxLayer grainLayer" aria-hidden="true"></div>
-
-  <!-- Custom glow cursor -->
-  <div class="cursorRing" id="ring"></div>
-  <div class="cursorDot" id="dot"></div>
 
   <div class="stage">
     <div class="container" id="container">
@@ -311,52 +301,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   })();
 
-  /* ================= Precise glow cursor — ring + dot ================= */
-  (function cursorGlow(){
-    const ring = document.getElementById('ring');
-    const dot  = document.getElementById('dot');
-    const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const isCoarse = matchMedia('(pointer: coarse)').matches;
-    if (prefersReduced || isCoarse){ ring.style.display='none'; dot.style.display='none'; return; }
 
-    let rx = innerWidth/2, ry = innerHeight/2, tx = rx, ty = ry;
-    let scale = 1, targetScale = 1;
-    let throttleFlip = false;
-    const heavy = (innerWidth*innerHeight*(window.devicePixelRatio||1)) > 5_000_000;
-
-    function move(e){ const t = e.touches?e.touches[0]:e; tx=t.clientX; ty=t.clientY; }
-    addEventListener('pointermove', move, {passive:true});
-
-    function isInteractiveAt(x,y){
-      const el = document.elementFromPoint(x,y);
-      if (!el) return false;
-      const sel = 'button, a, [role="button"], input, textarea, select, .btn';
-      return el.closest(sel) != null;
-    }
-
-    (function tick(){
-      if (heavy){ throttleFlip = !throttleFlip; if (throttleFlip){ requestAnimationFrame(tick); return; } }
-      rx += (tx - rx) * 0.18; ry += (ty - ry) * 0.18;
-      const overInteractive = isInteractiveAt(tx,ty);
-      targetScale = overInteractive ? 1.12 : 1.0;
-      scale += (targetScale - scale) * 0.2;
-
-      const x = rx+'px', y = ry+'px', t = 'translate(-50%,-50%) scale(' + scale.toFixed(3) + ')';
-      ring.style.left = x; ring.style.top = y; ring.style.transform = t;
-      dot.style.left  = x; dot.style.top  = y; dot.style.transform  = t;
-
-      /* Stronger glow on hover and idle */
-      ring.style.boxShadow = overInteractive
-        ? '0 0 40px rgba(90,140,255,0.95), 0 0 80px rgba(90,140,255,0.85), 0 0 120px rgba(90,140,255,0.7)'
-        : '0 0 30px rgba(90,140,255,0.85), 0 0 60px rgba(90,140,255,0.75), 0 0 90px rgba(90,140,255,0.65)';
-
-      dot.style.boxShadow = overInteractive
-        ? '0 0 25px rgba(90,140,255,1), 0 0 50px rgba(90,140,255,0.9), 0 0 100px rgba(90,140,255,0.8)'
-        : '0 0 20px rgba(90,140,255,1), 0 0 40px rgba(90,140,255,0.85), 0 0 80px rgba(90,140,255,0.7)';
-
-      requestAnimationFrame(tick);
-    })();
-  })();
 
   /* ================= Typing (suffix only, anchored, smooth, loop) ================= */
   (function typing(){
